@@ -11,3 +11,24 @@
 - Poprawne odłączenie się węzła opiera się na: rozgłoszeniu informacji w sieci o rozpoczęciu procedury odłączenia (zapobiegnie to sytuacji, kiedy w momencie "opróżniania" węzła powstaną nowe pliki, które zostałyby do niego przesłane), oznaczenia wszystkich przechowywanych zasobów jako "tymczasowo nieważnych" oraz ich redestrybucji do pozostałych węzłów sieci (które po odebraniu zasobów ponownie rozgłoszą ich aktualne deskryptory).
 - Zaniknięcie węzła - w przypadku, jeśli węzeł zakończył pracę nieprawidłowo, to przy pierwszej próbie połączenia przez którykolwiek z węzłów informacja o tym zostanie rozgłoszona po sieci - wtedy każdy z węzłów usunie z własnej listy deskryptorów te wpisy, których zasoby które znajdowały się na usuniętym węźle. Wszystkie ewentualne transmisje zwrócą błędy, a jeśli będzie to możliwe - odwrócą jak najwięcej szkód (np. jeśli awaria nastąpiła przy redestrybucji danego zasobu - wtedy po prostu węzeł dystrybuujący odznaczy "tymczasową nieważność" przesyłanych plików).
 
+## 4) Opis i analiza protokołów komunikacyjnych
+### Opis komunikatów
+Przesyłane wiadomości są opatrzone typem wiadomości (dołączenie do sieci, rozgłoszenie deskryptora, przesłanie pliku etc.) oraz rozmiarem danych, znajdujących się tuż za końcem struktury (mogą nimi być już deskryptory lub całe pliki). Typ danych znajdujących się za strukturą P2PMessage jest definiowany jednoznacznie przez typ wiadomości.
+```c
+struct P2PMessage {
+	MessageType messageType;
+	uint32_t additionalDataSize;
+}
+```
+
+### Deskryptor pliku
+Struktura, która jest dystrybuowana w sieci i definiuje pozycję i właściciela każdego pliku. 
+```c
+struct FileDescriptor {
+	char name[256];
+	MD5_T md5;
+	uint32_t ownerIp;
+	uint32_t holderIp;
+	uint32_t flags;
+}
+```
