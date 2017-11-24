@@ -73,3 +73,8 @@ struct FileDescriptor {
 
 ### Realizacja współbieżności
 Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje osobny wątek do obsługi węzła sieci P2P. Wątek węzła uruchamia wątki odpowiedzialne za nasłuchiwanie broadcastu oraz obsługę serwera TCP. W tych wątkach znowuż po odebraniu wiadomości (w nasłuchu UDP) lub nawiązaniu połączenia (serwer TCP) zostaną powołane kolejne wątki, obsługujące już pojedyncze połączenie/pakiet. Przetwarzają je i aktualizują struktury opisujące węzeł.
+
+![współbieżność](https://github.com/saleph/p2p_FileDistributor/blob/master/concurrencydiagram.png "Realizacja współbieżności")
+
+## 6) Zarys koncepcji implementacji
+Użyty zostanie C++ (jako pomoc przy budowie CLI oraz obsługi przesyłanych struktur w stopniu podstawowym - np. modyfikacje strumenia) wraz z częścią biblioteki `BOOST` - do przeprowadzania unit-testów oraz zbierania logów. Do obsługi współbieżności zostaną użyte POSIXowe `pthreads`, a do obsługi sieci - gniazda BSD.
