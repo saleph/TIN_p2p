@@ -62,3 +62,14 @@ struct FileDescriptor {
 ### Zależności czasowe
 
 ![diagram sekwencji](https://github.com/saleph/p2p_FileDistributor/blob/master/sequencediagrams.png "Diagram sekwencji")
+
+## 5) Moduły i realizacja współbieżności
+### Moduły
+1. Moduł węzła obsługujący protokół.
+2. Moduł obsługi sieci (serwera TCP oraz gniazda UDP).
+3. Moduł obsługi wielowątkowości (opakowanie pthreads).
+3. CLI komunikujące się z API modułu węzła.
+4. Moduł thread-safe loggera.
+
+### Realizacja współbieżności
+Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje osobny wątek do obsługi węzła sieci P2P. Wątek węzła uruchamia wątki odpowiedzialne za nasłuchiwanie broadcastu oraz obsługę serwera TCP. W tych wątkach znowuż po odebraniu wiadomości (w nasłuchu UDP) lub nawiązaniu połączenia (serwer TCP) zostaną powołane kolejne wątki, obsługujące już pojedyncze połączenie/pakiet. Przetwarzają je i aktualizują struktury opisujące węzeł.
