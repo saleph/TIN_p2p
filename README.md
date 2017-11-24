@@ -37,6 +37,7 @@ enum class MessageType {
 	DISCARD_DESCRIPTOR,	// UDP oznacz podany deskryptor jako "tymczasowo nieważny"
 	UPDATE_DESCRIPTOR,	// UDP rozgłoś nową wersję deskryptora (wcześniej oznaczonego jako "tymczasowo nieważny")
 	HOLDER_CHANGE,		// TCP przesłanie do określonego węzła zaktualizowanego deskryptora (wcześniej oznaczonego jako "tymczasowo nieważny") oraz pliku
+	FILE_TRANSFER,		// TCP przesłanie deskryptora oraz zawartości pliku do węzła, który wcześniej tego zażądał
 	
 	// interfejs użytkownika
 	UPLOAD_FILE,		// TCP żądanie uploadu pliku, zawiera w sekcji danych: deskryptor oraz plik (jako tablica bajtów)
