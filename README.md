@@ -18,17 +18,41 @@ Przesyłane wiadomości są opatrzone typem wiadomości (dołączenie do sieci, 
 struct P2PMessage {
 	MessageType messageType;
 	uint32_t additionalDataSize;
-}
+};
+```
+
+### Typy komunikatów
+Komunikaty oznaczone jako UDP będą broadcastowane w sieci. Oznaczone jako TCP - będą przesyłane bezpośrednio do określonego węzła.
+```c
+enum class MessageType {
+	// raportowanie stanu
+	HELLO,				// UDP komunikat wysyłany przez nowoutworzony węzeł
+	DISCONNECTING,		// UDP powiadomienie sieci o rozpoczęciu odłączania się
+	CONNECTION_LOST,	// UDP powiadomienie sieci o utraceniu węzła o określonym IP (podanym w sekcji danych)
+	
+	// zarządzanie plikami
+	NEW_FILE,			// UDP powiadomienie sieci o nowym pliku o danym deskryptorze (podanym w sekcji danych)
+	REVOKE_FILE,		// UDP powiadomienie sieci o usunięciu pliku o danym deskryptorze (podanym w sekcji danych)
+	DISCARD_DESCRIPTOR,	// UDP oznacz podany deskryptor jako "tymczasowo nieważny"
+	UPDATE_DESCRIPTOR,	// UDP rozgłoś nową wersję deskryptora (wcześniej oznaczonego jako "tymczasowo nieważny")
+	HOLDER_CHANGE,		// TCP przesłanie do określonego węzła zaktualizowanego deskryptora (wcześniej oznaczonego jako "tymczasowo nieważny") oraz pliku
+	
+	// interfejs użytkownika
+	UPLOAD_FILE,		// TCP żądanie uploadu pliku, zawiera w sekcji danych: deskryptor oraz plik (jako tablica bajtów)
+	GET_FILE,			// TCP żądanie przesłania pliku o danym deskryptorze (podanym w sekcji danych) od węzła przetrzymującego plik
+	DELETE_FILE,		// TCP żądanie unieważnienia pliku o danym deskryptorze (podanym w sekcji danych) do węzła przetrzymującego plik
+};
 ```
 
 ### Deskryptor pliku
-Struktura, która jest dystrybuowana w sieci i definiuje pozycję i właściciela każdego pliku. 
+Struktura, która jest dystrybuowana w sieci i definiuje pozycję i właściciela każdego pliku. Jej unikalnym polem jest hash MD5.
 ```c
 struct FileDescriptor {
-	char name[256];
 	MD5_T md5;
+	char name[256];
+	uint32_t size;
+	clock_t uploadTime;
 	uint32_t ownerIp;
 	uint32_t holderIp;
-	uint32_t flags;
-}
+};
 ```
