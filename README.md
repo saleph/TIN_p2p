@@ -58,3 +58,7 @@ struct FileDescriptor {
 	uint32_t holderIp;
 };
 ```
+
+### Zależności czasowe
+
+![diagram sekwencji](https://github.com/saleph/p2p_FileDistributor/blob/master/sequencediagrams.png "Diagram sekwencji")
