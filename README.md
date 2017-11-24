@@ -27,6 +27,7 @@ Komunikaty oznaczone jako UDP będą broadcastowane w sieci. Oznaczone jako TCP 
 enum class MessageType {
 	// raportowanie stanu
 	HELLO,				// UDP komunikat wysyłany przez nowoutworzony węzeł
+	HELLO_REPLY,		// TCP odpowiedź od węzłów, które usłyszały HELLO. Dołącza tablicę deskryptorów plików, które znajdowały się w danej chwili w konkretnym 
 	DISCONNECTING,		// UDP powiadomienie sieci o rozpoczęciu odłączania się
 	CONNECTION_LOST,	// UDP powiadomienie sieci o utraceniu węzła o określonym IP (podanym w sekcji danych)
 	
