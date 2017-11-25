@@ -10,6 +10,8 @@
 - Usunięcie pliku z sieci (unieważnienie przez właściciela) opiera się na wysłaniu bezpośredniego żądania usunięcia pliku do węzła, który ten plik aktualnie przechowuje. Oznacza on ten plik jako "usunięty" i rozsyła tę informację po całej sieci. Wtedy każdy z węzłów jest zobligowany do usunięcia deskryptora danego pliku ze swojej listy. Jeśli trwają jeszcze jakieś transmisje - to zostają one poprawnie zakończone po czym węzeł fizycznie usuwa zasób.
 - Poprawne odłączenie się węzła opiera się na: rozgłoszeniu informacji w sieci o rozpoczęciu procedury odłączenia (zapobiegnie to sytuacji, kiedy w momencie "opróżniania" węzła powstaną nowe pliki, które zostałyby do niego przesłane), oznaczenia wszystkich przechowywanych zasobów jako "tymczasowo nieważnych" oraz ich redestrybucji do pozostałych węzłów sieci (które po odebraniu zasobów ponownie rozgłoszą ich aktualne deskryptory).
 - Zaniknięcie węzła - w przypadku, jeśli węzeł zakończył pracę nieprawidłowo, to przy pierwszej próbie połączenia przez którykolwiek z węzłów informacja o tym zostanie rozgłoszona po sieci - wtedy każdy z węzłów usunie z własnej listy deskryptorów te wpisy, których zasoby które znajdowały się na usuniętym węźle. Wszystkie ewentualne transmisje zwrócą błędy, a jeśli będzie to możliwe - odwrócą jak najwięcej szkód (np. jeśli awaria nastąpiła przy redestrybucji danego zasobu - wtedy po prostu węzeł dystrybuujący odznaczy "tymczasową nieważność" przesyłanych plików).
+- Konflikt nazw - nie występuje. Jeśli taka sytuacja nastąpi, to CLI wyświetli oba pliki wraz z fragmentem ich hasha.
+- Konflikt hashy - przypadek, kiedy ten sam plik został zuploadowany przed propagacją informacji o poprzednio dodanym pliku. Wtedy każdy z węzłów automatycznie usuwa deskryptor pliku, który miał późniejszy "uploadTime".
 
 ## 4) Opis i analiza protokołów komunikacyjnych
 ### Opis komunikatów
@@ -30,6 +32,7 @@ enum class MessageType {
 	HELLO_REPLY,		// TCP odpowiedź od węzłów, które usłyszały HELLO. Dołącza tablicę deskryptorów plików, które znajdowały się w danej chwili w konkretnym 
 	DISCONNECTING,		// UDP powiadomienie sieci o rozpoczęciu odłączania się
 	CONNECTION_LOST,	// UDP powiadomienie sieci o utraceniu węzła o określonym IP (podanym w sekcji danych)
+	CMD_REFUSED,		// TCP powiadomienie węzła, który złożył żądanie (np. o pobranie pliku) o braku możliwości wykonania transkacji (np. dostęp do pliku oznaczonego jako "tymczasowo nieważny" albo próba przesłania pliku do węzła w stanie "disconnecting")
 	
 	// zarządzanie plikami
 	NEW_FILE,			// UDP powiadomienie sieci o nowym pliku o danym deskryptorze (podanym w sekcji danych)
