@@ -1,0 +1,42 @@
+# MAGIC SEQUENCE: win32 encoding problems
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8')
+# END OF MAGIC SEQUENCE
+import os.path as path
+from sys import platform
+
+linux_boost_prefix = "~/boost_1_65_1"
+
+
+# boost prefix depending on OS
+boost_prefix = linux_boost_prefix
+    
+# boost's libs dir
+boost_libs = path.join(boost_prefix, "libs")
+
+# environment prep
+env = Environment()
+env.Prepend(CPPPATH = [boost_prefix, ".."], LIBPATH=[boost_libs, "."])
+env.Repository(path.join("..", "include"))
+
+# multithread compilation - problems on windows
+if platform != "win32":
+    import multiprocessing
+    num_cpu = multiprocessing.cpu_count()
+    env.SetOption('num_jobs', num_cpu)
+
+# app's lib prep
+app_lib_src = env.Glob(path.join("src", "library_src", "*.cpp"))
+env.StaticLibrary("appLib", app_lib_src)
+
+# main executing program prep
+app_src = env.Glob(path.join("src", "*.cpp"))
+app = env.Program(path.join("..", "app"), app_src, LIBS='appLib')
+
+# tests preparation
+tests_files = [env.Glob(path.join("tests_src", "*", "*.cpp")), path.join("tests_src", "main.cpp")]
+tests = env.Program(path.join("..", "tests"), tests_files, LIBS=['appLib'])
+
+# "$ scons" default build
+env.Default(app, tests)
