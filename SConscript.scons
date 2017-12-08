@@ -36,7 +36,7 @@ app = env.Program(path.join("..", "app"), app_src, LIBS='appLib')
 
 # tests preparation
 tests_files = [env.Glob(path.join("tests_src", "*", "*.cpp")), path.join("tests_src", "main.cpp")]
-tests = env.Program(path.join("..", "tests"), tests_files, LIBS=['appLib'])
+tests = env.Program(path.join("..", "tests"), tests_files, LIBS=['appLib', 'pthread'])
 
 # "$ scons" default build
 env.Default(app, tests)
