@@ -8,6 +8,7 @@
 
 # executable
 monitor*
+app
 tests*
 !tests_src
 
