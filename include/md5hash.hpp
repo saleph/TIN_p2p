@@ -13,6 +13,7 @@ class Md5Hash {
 	char hash[MD5_HASH_LENGTH + 1];
 
 public:
+	Md5Hash() { }
 	Md5Hash(const std::string &h) {
 		assert(h.size() == MD5_HASH_LENGTH);
 		strcpy(hash, h.c_str());
