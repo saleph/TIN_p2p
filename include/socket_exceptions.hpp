@@ -8,11 +8,10 @@
 #ifndef INCLUDE_SOCKET_EXCEPTIONS_HPP_
 #define INCLUDE_SOCKET_EXCEPTIONS_HPP_
 
-class SocketException : std::runtime_error
+class SocketException : public std::runtime_error
 {
+public:
 	SocketException(const char* s) : std::runtime_error(s) { };
 };
-
-
 
 #endif /* INCLUDE_SOCKET_EXCEPTIONS_HPP_ */

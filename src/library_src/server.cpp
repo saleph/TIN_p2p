@@ -1,5 +1,6 @@
 #include "server.hpp"
-#include <iostream>
+
+#include <unistd.h>
 
 void Server::finishThread()
 {
@@ -29,7 +30,8 @@ void Server::pushConnectionThread(Thread& t)
 
 void Server::stopListening()
 {
-	stop = true;
+	listenThread->kill(5);
+	close(listenSocket);
 	waitForThreadsToFinish();
 }
 
@@ -39,6 +41,11 @@ void Server::waitForThreadsToFinish()
 	{
 		t.get();
 	}
+}
+
+Server::Server()
+{
+
 }
 
 Server::~Server()

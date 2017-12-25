@@ -6,7 +6,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-class UdpServer : Server
+#include "server.hpp"
+
+class UdpServer : public Server
 {
 	const int PORT = 2000;
 	int broadcastEnable = 1;
@@ -20,7 +22,7 @@ class UdpServer : Server
 		in_addr_t senderIp;
 	};
 
-	void (*react)(uint8_t* data, size_t size, SocketOperation op);
+	void (*react)(uint8_t* data, uint32_t size, SocketOperation op);
 	static void* actualStartListening(void* ctx);
 	static void* handleBroadcastReceive(void* ctx);
 public:

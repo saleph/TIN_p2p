@@ -6,13 +6,12 @@
 #include <iostream>
 #include <errno.h>
 #include <fcntl.h>
-#include <chrono>
-#include <ctime>
 
 #include "tcp_server.hpp"
 #include "socket_exceptions.hpp"
+#include "p2pMessage.hpp"
 
-TcpServer::TcpServer(void (*reactFunc)(uint8_t*, size_t),
+TcpServer::TcpServer(void (*reactFunc)(uint8_t* data, uint32_t size, SocketOperation),
 		void (*errorCallbackFunc)(SocketOperation) )
 {
 	react = reactFunc;
@@ -29,47 +28,54 @@ void TcpServer::startListening()
 	int listenSocket = socket(AF_INET , SOCK_STREAM , 0);
 	if (listenSocket == -1)
 	{
-		throw SocketException("Could not create listening socket. Additional"
-				"info: " + strerror(errno));
+		std::string err = "Could not create listening socket. Additional"
+				"info: ";
+		err += strerror(errno);
+		throw SocketException(err.c_str());
 	}
 
 	if( bind(listenSocket,(struct sockaddr *)&recvAddr , sizeof(recvAddr)) < 0)
 	{
-		throw SocketException("Could not bind listening socket. Additional"
-				"info: " + strerror(errno));
+		std::string err = "Could not bind listening socket. Additional"
+				"info: ";
+		err += strerror(errno);
+		throw SocketException(err.c_str());
 	}
 
 	SocketContext* ctx = new SocketContext();
 	*ctx = { this, listenSocket };
-	Thread(&TcpServer::actualStartListening, (void*) ctx, NULL);
+	Thread t(&TcpServer::actualStartListening, (void*) ctx, NULL);
+	listenThread = &t;
 }
 
 void* TcpServer::actualStartListening(void* args)
 {
 		TcpServer* serverInstance = (TcpServer*)((SocketContext*)args)->serverInstance;
-		int listenSocket = ((SocketContext*)args)->connSocket;
-		listen(listenSocket, 5);
+		serverInstance->listenSocket = ((SocketContext*)args)->connSocket;
+		delete (SocketContext*)args;
+		listen(serverInstance->listenSocket, 5);
 
 		sockaddr_in senderAddr;
 		unsigned int senderAddrSize;
 		pthread_t lastThread;
 
-		while(!stop)
+		while(1)
 		{
-			int connSock = accept(listenSocket, (sockaddr*)&senderAddr, &senderAddrSize);
+			int connSock = accept(serverInstance->listenSocket,
+					(sockaddr*)&senderAddr, &senderAddrSize);
 			SocketContext* ctx = new SocketContext();
-			*ctx = { this, connSock, senderAddr.sin_addr.s_addr };
-			threadsVecMutex.lock();
+			*ctx = { serverInstance, connSock, senderAddr.sin_addr.s_addr };
+			serverInstance->threadsVecMutex.lock();
 			Thread t = Thread(&TcpServer::handleConnectionHelper,
 					(void*) ctx, NULL);
-			connectionThreads.push_back(t);
-			threadsVecMutex.unlock();
+			serverInstance->connectionThreads.push_back(t);
+			serverInstance->threadsVecMutex.unlock();
 		}
 
-		waitForThreadsToFinish();
-		close(connSock);
-		delete args;
-		finishThread();
+		/*std::cout << "CLOSING FFS\n";
+		close(listenSocket);
+		delete (SocketContext*)args;
+		serverInstance->finishThread();*/
 }
 
 void* TcpServer::handleConnectionHelper(void* args)
@@ -84,21 +90,24 @@ void* TcpServer::handleConnectionHelper(void* args)
 void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
 {
 	int readLength;
-	uint8_t buf[1000];
+	uint8_t* buf;
+	P2PMessage msg;
 
-	do
-	{
-		readLength = read(sock, (void*)buf, sizeof(buf));
-	} while(readLength == sizeof(buf));
+	readLength = read(sock, (void*)&msg, sizeof(msg));
+	buf = new uint8_t[sizeof(msg) + msg.getAdditionalDataSize()];
+	memcpy((void*)buf, &msg, sizeof(msg));
+	readLength = read(sock, (void*)(buf + sizeof(msg)), msg.getAdditionalDataSize());
 
 	SocketOperation op = { SocketOperation::Type::TcpReceive,
 	SocketOperation::Status::Success, senderAddr };
 
 	close(sock);
 	if (readLength == -1)
-		errorCallback();
+		errorCallback(op);
 	else
 		react(buf, readLength, op);
+
+	delete buf;
 }
 
 void TcpServer::sendData(uint8_t* data, size_t n, in_addr_t toWhom)
@@ -108,9 +117,8 @@ void TcpServer::sendData(uint8_t* data, size_t n, in_addr_t toWhom)
 	ActualSendDataContext* ctx = new ActualSendDataContext;
 	ctx->serverInstance = this;
 	ctx->args = args;
-	Guard* g = new Guard(threadsVecMutex);
-	connectionThreads.push_back( Thread(actualSendDataHelper, (void*)ctx, NULL) );
-	delete g;
+	Thread t = Thread(actualSendDataHelper, (void*)ctx, NULL);
+	pushConnectionThread(t);
 }
 
 void* TcpServer::actualSendDataHelper(void* args)
@@ -124,7 +132,7 @@ void* TcpServer::actualSendDataHelper(void* args)
 	server->finishThread();
 }
 
-void TcpServer::actualSendData(uint8_t* data, size_t size, in_addr_t toWhom)
+void TcpServer::actualSendData(uint8_t* data, uint32_t size, in_addr_t toWhom)
 {
 	sockaddr_in sendAddr;
 	sendAddr.sin_family = AF_INET;

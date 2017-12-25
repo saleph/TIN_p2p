@@ -10,7 +10,7 @@
 
 #include "server.hpp"
 
-class TcpServer : Server
+class TcpServer : public Server
 {
 private:
 	// arguments struct for actualSendData
@@ -30,22 +30,21 @@ private:
 	};
 
 	const int LISTEN_PORT = 3333;
-	bool stop = false;
 
-	void (*react)(uint8_t*, size_t, SocketOperation);
+	void (*react)(uint8_t*, uint32_t, SocketOperation);
 	void (*errorCallback)(SocketOperation op);
+
 
 	static void* actualStartListening(void* context);
 	static void* handleConnectionHelper(void* context);
 	static void* actualSendDataHelper(void* context);
 	void handleConnection(int connSocket, in_addr_t senderAddr);
-	void actualSendData(uint8_t* data, size_t size, in_addr_t toWhom);
+	void actualSendData(uint8_t* data, uint32_t size, in_addr_t toWhom);
 public:
-	TcpServer(void (*react)(uint8_t*, size_t, SocketOperation),
+	TcpServer(void (*react)(uint8_t*, uint32_t, SocketOperation),
 			void (*errorCallbackFunc)(SocketOperation));
 	void startListening();
 	void sendData(uint8_t* data, size_t n, in_addr_t toWhom);
-	void stopListening();
 };
 
 

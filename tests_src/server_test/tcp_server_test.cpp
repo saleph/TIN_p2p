@@ -13,7 +13,7 @@ int resolveCallbackCount = 0;
 uint8_t* receivedData;
 size_t receivedDataSize;
 
-void resolveCallback(uint8_t* x, size_t s)
+void resolveCallback(uint8_t* x, uint32_t s, SocketOperation op)
 {
 	receivedData = x;
 	receivedDataSize = s;
@@ -21,7 +21,7 @@ void resolveCallback(uint8_t* x, size_t s)
 	return;
 }
 
-void errorCallBack(SocketOperation s)
+void errorCallback(SocketOperation s)
 {
 	++errorCallbackCount;
 	return;
@@ -29,8 +29,10 @@ void errorCallBack(SocketOperation s)
 
 BOOST_AUTO_TEST_CASE(checkTcpServerWorksAtAll)
 {
-	TcpServer server;
+	TcpServer server(&resolveCallback, &errorCallback);
 	uint8_t data[10000];
 	server.startListening();
 	server.sendData(data, sizeof(data), inet_addr("127.0.0.1"));
+	usleep(500000);
+	BOOST_CHECK(resolveCallbackCount == 1);
 }
