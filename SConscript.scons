@@ -17,7 +17,7 @@ boost_libs = path.join(boost_prefix, "libs")
 
 # environment prep
 env = Environment()
-env.Prepend(CPPPATH = [boost_prefix, ".."], LIBPATH=[boost_libs, "."])
+env.Prepend(CXXFLAGS=["-std=c++11"], CPPPATH = [boost_prefix, ".."], LIBPATH=[boost_libs, "."])
 env.Repository(path.join("..", "include"))
 
 # multithread compilation - problems on windows
