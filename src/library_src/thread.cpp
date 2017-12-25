@@ -16,6 +16,10 @@ void Thread::exit() {
     pthread_exit(NULL);
 }
 
+bool Thread::isCurrentThread() {
+	return pthread_equal(this->thread_id, pthread_self());
+}
+
 void Thread::kill(int signal) {
     pthread_kill(thread_id,signal);
 }

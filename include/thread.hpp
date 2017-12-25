@@ -7,11 +7,11 @@ class Thread {
 private:
     pthread_t thread_id;
     void ** rv;
-
 public:
     Thread(void * function_pointer(void *), void * arg, void ** retval);
     void * get();
-    void exit();
+    static void exit();
+    bool isCurrentThread();
     void kill(int signal);
 };
 
