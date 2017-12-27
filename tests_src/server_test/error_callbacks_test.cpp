@@ -62,10 +62,9 @@ BOOST_AUTO_TEST_CASE(checkReceiveFailCallback)
     msg.setAdditionalDataSize(50000);
     memcpy(data, &msg, sizeof(msg));
     server.sendData(data, 50, inet_addr("127.0.0.1"));
-    usleep(50000);
-    BOOST_TEST(Config::operation.status == SocketOperation::Status::ReceiveFailed);
-
+    usleep(200000);
     server.stopListening();
+    BOOST_TEST(Config::operation.status == SocketOperation::Status::ReceiveFailed);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

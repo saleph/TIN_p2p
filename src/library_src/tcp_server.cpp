@@ -34,20 +34,19 @@ void TcpServer::startListening()
 		throw SocketException(err.c_str());
 	}
 
-	if( bind(listenSocket,(struct sockaddr *)&recvAddr , sizeof(recvAddr)) < 0)
-	{
-
-		std::string err = "Could not bind listening socket. Additional"
-				"info: ";
-		err += strerror(errno);
-		throw SocketException(err.c_str());
-	}
-
 	int enable = 1;
 	setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR,
 		&enable, sizeof enable);
     setsockopt(listenSocket, SOL_SOCKET, SO_REUSEPORT,
 		&enable, sizeof enable);
+
+	if( bind(listenSocket,(struct sockaddr *)&recvAddr , sizeof(recvAddr)) < 0)
+	{
+		std::string err = "Could not bind listening socket. Additional"
+				"info: ";
+		err += strerror(errno);
+		throw SocketException(err.c_str());
+	}
 
 	SocketContext* ctx = new SocketContext(this, listenSocket, 0);
 	Thread t(&TcpServer::actualStartListening, (void*) ctx, NULL);
@@ -106,6 +105,7 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
                 sizeof(timeout));
 
 	readLength = recv(sock, (void*)&msg, sizeof(msg), 0);
+	std::cout << "Read: " << readLength << std::endl;
     if(checkReceiveIssues(readLength, senderAddr, sizeof(msg)))
     {
         return;
@@ -120,11 +120,13 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
 	while(remainingSize > 0)
     {
         readLength = recv(sock, streamPointer, remainingSize, 0);
+        std::cout << "Read: " << readLength << std::endl;
         if(checkReceiveIssues(readLength, senderAddr))
         {
             delete[] buf;
             return;
         }
+        std::cout << "Post check issues: " << std::endl;
         remainingSize -= readLength;
         streamPointer += readLength;
     }
