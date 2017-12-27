@@ -106,7 +106,6 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
                 sizeof(timeout));
 
 	readLength = recv(sock, (void*)&msg, sizeof(msg), 0);
-	std::cout << "read: " << readLength << std::endl;
     if(checkReceiveIssues(readLength, senderAddr, sizeof(msg)))
     {
         return;
@@ -117,11 +116,10 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
 	memcpy((void*)buf, &msg, sizeof(msg));
 
 	uint32_t remainingSize = msg.getAdditionalDataSize();
-	void* streamPointer = (void*)(buf + sizeof(msg));
+	uint8_t* streamPointer = (uint8_t*)(buf + sizeof(msg));
 	while(remainingSize > 0)
     {
         readLength = recv(sock, streamPointer, remainingSize, 0);
-        std::cout << "read: " << readLength << std::endl;
         if(checkReceiveIssues(readLength, senderAddr))
         {
             delete[] buf;

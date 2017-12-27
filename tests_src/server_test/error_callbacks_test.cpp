@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(checkReceiveFailCallback)
     uint8_t* data = new uint8_t[50];
     server.sendData(data, 1, inet_addr("127.0.0.1"));
 
-    usleep(100000);
+    usleep(200000);
     BOOST_TEST(Config::operation.status == SocketOperation::Status::ReceiveFailed);
 
     Config::operation.status = SocketOperation::Status::Success;
