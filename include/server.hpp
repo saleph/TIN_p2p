@@ -14,7 +14,7 @@ protected:
 	std::vector <Thread> connectionThreads;
 	Mutex threadsVecMutex;
 	int listenSocket;
-	Thread* listenThread;
+	bool stop = false;
 
 	struct SocketContext
 	{
@@ -22,15 +22,15 @@ protected:
 		int connSocket;
 		in_addr_t connAddr;
 
-		void setValues(Server* s, int c, in_addr_t a)
+		SocketContext(Server* s, int c, in_addr_t a) : serverInstance(s), connSocket(c), connAddr(a)
 		{
-			serverInstance = s; connSocket = c; connAddr = a;
 		}
 	};
 
 	void finishThread();
 	void pushConnectionThread(Thread& t);
 	void waitForThreadsToFinish();
+	bool addDispatcherThread(void * function_pointer(void *), void * arg, void ** retval);
 public:
 	Server();
 	virtual void startListening() = 0;

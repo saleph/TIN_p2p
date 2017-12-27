@@ -4,35 +4,47 @@
 
 void Server::finishThread()
 {
-	Guard* g = new Guard(threadsVecMutex);
+    if (stop) return;
+
+	threadsVecMutex.lock();
 	for (auto i = connectionThreads.begin(); i != connectionThreads.end(); ++i)
 	{
 		if ( i->isCurrentThread() )
 		{
 			connectionThreads.erase(i);
-			delete g;
+            threadsVecMutex.unlock();
 			pthread_detach(pthread_self());
 			Thread::exit();
 		}
 	}
 	// listener thread
-	delete g;
+	threadsVecMutex.unlock();
 	pthread_detach(pthread_self());
 	Thread::exit();
 }
 
-void Server::pushConnectionThread(Thread& t)
+void Server::stopListening()
 {
-	threadsVecMutex.lock();
-	connectionThreads.push_back(t);
+    threadsVecMutex.lock();
+    stop = true;
+    shutdown(listenSocket, SHUT_RDWR);
+	waitForThreadsToFinish();
+	close(listenSocket);
 	threadsVecMutex.unlock();
 }
 
-void Server::stopListening()
+bool Server::addDispatcherThread(void * function_pointer(void *), void * arg, void ** retval)
 {
-	listenThread->kill(5);
-	close(listenSocket);
-	waitForThreadsToFinish();
+    threadsVecMutex.lock();
+    if (stop)
+    {
+        threadsVecMutex.unlock();
+        return false;
+    }
+    Thread t(function_pointer, arg , retval);
+    connectionThreads.push_back(t);
+    threadsVecMutex.unlock();
+    return true;
 }
 
 void Server::waitForThreadsToFinish()

@@ -7,6 +7,8 @@
 
 #include "socket_exceptions.hpp"
 
+#define BUF_SIZE 1024
+
 UdpServer::UdpServer(void (*receiveBroadcastCallback)(uint8_t*, uint32_t, SocketOperation op))
 {
 	broadcastAddr.sin_family = AF_INET;
@@ -45,15 +47,15 @@ void UdpServer::broadcast(uint8_t* bytes, uint32_t size)
 
 void UdpServer::startListening()
 {
-	int mySocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	setsockopt(mySocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof broadcastEnable);
+	listenSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	setsockopt(listenSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof broadcastEnable);
 
 	sockaddr_in recvAddr;
 	recvAddr.sin_family = AF_INET;
 	recvAddr.sin_port = htons(PORT);
 	recvAddr.sin_addr.s_addr = INADDR_ANY;
 
-	if(bind(mySocket, (struct sockaddr *) &recvAddr, sizeof recvAddr) == -1)
+	if(bind(listenSocket, (struct sockaddr *) &recvAddr, sizeof recvAddr) == -1)
 	{
 		std::string err = "Could not create broadcast listening socket"
 				" Additional info: ";
@@ -61,11 +63,9 @@ void UdpServer::startListening()
 		throw SocketException(err.c_str());
 	}
 
-	SocketContext* ctx = new SocketContext;
-	ctx->setValues((Server*)this, mySocket, 0);
+	SocketContext* ctx = new SocketContext((Server*)this, listenSocket, 0);
 
 	Thread t(&UdpServer::actualStartListening, (void*)ctx, NULL);
-	pushConnectionThread(t);
 }
 
 void* UdpServer::actualStartListening(void* ctx)
@@ -76,30 +76,42 @@ void* UdpServer::actualStartListening(void* ctx)
 	sockaddr_in sender;
 	unsigned int slen = sizeof(sockaddr);
 	uint8_t* buf;
+    uint32_t rcvlen;
 
 	while(1)
 	{
-		buf = new uint8_t[1024];
+		buf = new uint8_t[BUF_SIZE];
 		sockaddr_in sender;
-		uint32_t len = recvfrom(mySocket, buf, sizeof(buf), 0, (sockaddr*)&sender, &slen);
-		HandleBroadcastArgs* args = new HandleBroadcastArgs;
-		*args = { server, buf, len, sender.sin_addr.s_addr };
-		Thread t(&UdpServer::handleBroadcastReceive, (void*)args , NULL);
+        rcvlen = recvfrom(mySocket, buf, BUF_SIZE, 0, (sockaddr*)&sender, &slen);
+        if (rcvlen == 0)
+        {
+            if (server->stop) return NULL;
+            else continue;
+        }
+
+        HandleBroadcastArgs* args = new HandleBroadcastArgs(server, buf, rcvlen, sender.sin_addr.s_addr);
+		if(!server->addDispatcherThread(&UdpServer::handleBroadcastReceive, (void*)args , NULL))
+        {
+            delete args;
+            return NULL;
+        }
 	}
-
-
-	close(mySocket);
-	server->finishThread();
 }
 
 void* UdpServer::handleBroadcastReceive(void* handleArgs)
 {
 	HandleBroadcastArgs* args = (HandleBroadcastArgs*) handleArgs;
+	UdpServer* server = args->serverInstance;
 	SocketOperation op = { SocketOperation::Type::UdpReceive,
 			SocketOperation::Status::Success, args->senderIp
 	};
-	args->serverInstance->react(args->data, args->dataSize, op);
-	delete args->data;
+	server->react(args->data, args->dataSize, op);
+	delete[] args->data;
 	delete args;
-	args->serverInstance->finishThread();
+	server->finishThread();
+}
+
+UdpServer::~UdpServer()
+{
+
 }

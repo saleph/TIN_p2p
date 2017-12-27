@@ -3,13 +3,13 @@
 
 Thread::Thread(void * function_pointer(void *), void * arg, void ** retval) {
     pthread_create(&thread_id,NULL,function_pointer,arg);
-    if (retval != NULL)
-        rv = retval;
+    //if (retval != NULL)
+    rv = retval;
 }
 
 void * Thread::get() {
     pthread_join(thread_id,rv);
-    return *rv;
+    return rv == NULL ? NULL : *rv;
 }
 
 void Thread::exit() {

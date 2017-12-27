@@ -18,7 +18,9 @@ struct SocketOperation
 	{
 		Success,
 		CantOpenSocket,
-		CantConnect
+		CantConnect,
+		ReceiveFailed,
+		SendFailed
 	};
 
 	Type type;
@@ -28,25 +30,7 @@ struct SocketOperation
 	SocketOperation(Type t, Status s, in_addr_t addr) : type(t), status(s),
 			connectionAddr(addr) {}
 
-	/*std::string toString()
-	{
-		std::string operationTypeString = (type == Send ? "Send to" : "Receive from");
-		std::string operationStatusString;
-		char buf[INET_ADDRSTRLEN];
-
-		switch(status)
-		{
-			case Success:
-				operationStatusString = "Success";
-				break;
-
-		}
-
-		return "Operation " + operationTypeString
-				+ inet_ntop(AF_INET, (void*)connectionAddr, buf, sizeof(buf) )
-				+ start_time + " ended at " + end_time + " with status "
-				+ operationStatusString;
-	}*/
+    SocketOperation() {}
 
 };
 
