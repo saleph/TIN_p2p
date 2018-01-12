@@ -22,18 +22,6 @@ void p2p::util::processTcpMsg(uint8_t *data, uint32_t size, SocketOperation oper
     assert (additionalDataSize == p2pMessage.getAdditionalDataSize());
 
     messageProcessors.at(messageType)(additionalData, additionalDataSize, operation.connectionAddr);
-
-    switch (messageType) {
-        case MessageType::HELLO_REPLY: break;
-        case MessageType::CMD_REFUSED: break;
-        case MessageType::HOLDER_CHANGE: break;
-        case MessageType::FILE_TRANSFER: break;
-        case MessageType::UPLOAD_FILE: break;
-        case MessageType::GET_FILE: break;
-        case MessageType::DELETE_FILE: break;
-        default:
-            BOOST_LOG_TRIVIAL(debug) << "Unknown MessageType in processTcpMsg";
-    }
 }
 
 void p2p::util::processUdpMsg(uint8_t *data, uint32_t size, SocketOperation operation) {
@@ -44,18 +32,6 @@ void p2p::util::processUdpMsg(uint8_t *data, uint32_t size, SocketOperation oper
     assert (additionalDataSize == p2pMessage.getAdditionalDataSize());
 
     messageProcessors.at(messageType)(additionalData, additionalDataSize, operation.connectionAddr);
-
-    switch (messageType) {
-        case MessageType::HELLO: break;
-        case MessageType::DISCONNECTING: break;
-        case MessageType::CONNECTION_LOST: break;
-        case MessageType::NEW_FILE: break;
-        case MessageType::REVOKE_FILE: break;
-        case MessageType::DISCARD_DESCRIPTOR: break;
-        case MessageType::UPDATE_DESCRIPTOR: break;
-        default:
-            BOOST_LOG_TRIVIAL(debug) << "Unknown MessageType in processUdpMsg";
-    }
 }
 
 void p2p::util::initProcessingFunctions() {
