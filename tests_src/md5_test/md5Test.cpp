@@ -5,11 +5,18 @@
 
 BOOST_AUTO_TEST_SUITE(Md5Test);
 
+const std::string EXAMPLE_FILE = "../tests_src/md5_test/example.txt";
+
 BOOST_AUTO_TEST_CASE(checkExampleFileMD5HashValidity)
 {
+    Md5sum md5File(EXAMPLE_FILE);
+
+	std::string content = "md5 test";
+	std::istringstream stream(content);
 	const std::string EXAMPLE_FILE_MD5 = "90ebef7754cd9e4441622f39f10c63d3";
-	Md5sum md5("tests_src/md5_test/example.txt");
-	BOOST_TEST(md5.getMd5Hash().getHash() == EXAMPLE_FILE_MD5);
+	Md5sum md5(stream);
+	BOOST_CHECK_EQUAL(md5.getMd5Hash().getHash(), md5File.getMd5Hash().getHash());
+    BOOST_CHECK_EQUAL(md5.getMd5Hash().getHash(), EXAMPLE_FILE_MD5);
 }
 
 BOOST_AUTO_TEST_CASE(checkNotExistingFile)

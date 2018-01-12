@@ -5,6 +5,9 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <iostream>
+#include <istream>
+#include <iterator>
 #include <ctype.h>
 #include <iostream>
 #include <exception>
@@ -14,9 +17,12 @@
 
 class Md5sum {
 	const std::string filename;
+    Md5Hash hash;
 
 public:
-	Md5sum(const std::string &filename);
+    explicit Md5sum(const std::string &filename);
+
+    explicit Md5sum(std::istream &stream);
 
 	Md5Hash getMd5Hash() const;
 };

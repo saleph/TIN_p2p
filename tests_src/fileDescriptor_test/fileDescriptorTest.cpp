@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <stdexcept>
 
-const std::string EXAMPLE_FILE = "tests_src/md5_test/example.txt";
+const std::string EXAMPLE_FILE = "../tests_src/md5_test/example.txt";
 
 BOOST_AUTO_TEST_SUITE(FileDescriptorTests);
 
