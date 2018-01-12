@@ -1,6 +1,7 @@
 #ifndef INCLUDE_MESSAGETYPE_HPP_
 #define INCLUDE_MESSAGETYPE_HPP_
 
+#include <boost/functional/hash.hpp>
 
 /// Enum class describing whole protocol abilities.
 enum class MessageType {
@@ -24,6 +25,21 @@ enum class MessageType {
 	GET_FILE,			// TCP żądanie przesłania pliku o danym deskryptorze (podanym w sekcji danych) od węzła przetrzymującego plik
 	DELETE_FILE,		// TCP żądanie unieważnienia pliku o danym deskryptorze (podanym w sekcji danych) do węzła przetrzymującego plik
 };
+
+
+namespace std {
+    template <>
+    struct hash<MessageType>
+    {
+        std::size_t operator()(const MessageType& messageType) const {
+            auto resourceId = static_cast<typename std::underlying_type<MessageType>::type>(messageType);
+            std::size_t hashValue = 0;
+            boost::hash_combine(hashValue, resourceId);
+            return hashValue;
+        }
+    };
+}
+
 
 
 #endif /* INCLUDE_MESSAGETYPE_HPP_ */
