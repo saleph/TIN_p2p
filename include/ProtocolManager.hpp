@@ -9,12 +9,16 @@
 #include "messageType.hpp"
 #include <boost/log/trivial.hpp>
 #include <unordered_map>
+#include <vector>
 
 namespace p2p {
     namespace util {
         std::unordered_map<MessageType, std::function<void(const uint8_t*, uint32_t, in_addr_t)>> messageProcessors;
         std::shared_ptr<TcpServer> tcpServer;
         std::shared_ptr<UdpServer> udpServer;
+		
+		std::vector<FileDescriptor> localDescriptors;
+		std::vector<FileDescriptor> networkDescriptors;
 
         void processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
         void processTcpError(SocketOperation operation);
