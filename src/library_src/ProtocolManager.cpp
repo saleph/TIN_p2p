@@ -52,7 +52,7 @@ void p2p::util::initProcessingFunctions() {
 
 		size = sizeof(P2PMessage) + additionalSize;
 
-		util::udpServer->broadcast(data, size);
+		util::tcpServer.sendData(data, size, sourceAdress);
     };
 
     messageProcessors[MessageType::HELLO_REPLY] = [] (const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
