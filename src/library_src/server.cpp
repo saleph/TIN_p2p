@@ -1,12 +1,19 @@
 #include "server.hpp"
 
 #include <unistd.h>
+#include <iostream>
 
 void Server::finishThread()
 {
-    if (stop) return;
-
+    stopMutex.lock();
+    if (stop.load())
+    {
+        stopMutex.unlock();
+        return;
+    }
 	threadsVecMutex.lock();
+	stopMutex.unlock();
+
 	for (auto i = connectionThreads.begin(); i != connectionThreads.end(); ++i)
 	{
 		if ( i->isCurrentThread() )
@@ -17,50 +24,55 @@ void Server::finishThread()
 			Thread::exit();
 		}
 	}
-	// listener thread
-	threadsVecMutex.unlock();
-	pthread_detach(pthread_self());
-	Thread::exit();
 }
 
 void Server::stopListening()
 {
-    threadsVecMutex.lock();
+    stopMutex.lock();
     stop = true;
     shutdown(listenSocket, SHUT_RDWR);
+    threadsVecMutex.lock();
+    stopMutex.unlock();
+
 	waitForThreadsToFinish();
 	close(listenSocket);
 	threadsVecMutex.unlock();
+
+	if (listenerThread != nullptr)
+    {
+        listenerThread->get();
+        delete listenerThread;
+    }
 }
 
 bool Server::addDispatcherThread(void * function_pointer(void *), void * arg, void ** retval)
 {
-    threadsVecMutex.lock();
+    stopMutex.lock();
     if (stop)
     {
-        threadsVecMutex.unlock();
+        stopMutex.unlock();
         return false;
     }
-    Thread t(function_pointer, arg , retval);
-    connectionThreads.push_back(t);
+    threadsVecMutex.lock();
+    stopMutex.unlock();
+    connectionThreads.emplace_back(function_pointer, arg , retval);
     threadsVecMutex.unlock();
     return true;
 }
 
 void Server::waitForThreadsToFinish()
 {
-	for (Thread t : connectionThreads)
+	for (auto i = connectionThreads.begin(); i != connectionThreads.end(); ++i)
 	{
-		t.get();
+		i->get();
 	}
 }
 
-Server::Server()
+Server::Server() : stop(false)
 {
-
+    listenerThread = nullptr;
 }
 
 Server::~Server()
 {
-
 }

@@ -7,6 +7,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+
 #include "tcp_server.hpp"
 #include "socket_exceptions.hpp"
 #include "p2pMessage.hpp"
@@ -49,15 +52,15 @@ void TcpServer::startListening()
 	}
 
 	SocketContext* ctx = new SocketContext(this, listenSocket, 0);
-	Thread t(&TcpServer::actualStartListening, (void*) ctx, NULL);
+	listenerThread = new Thread(&TcpServer::actualStartListening, (void*) ctx, NULL);
 }
 
 void* TcpServer::actualStartListening(void* args)
 {
 		TcpServer* serverInstance = (TcpServer*)((SocketContext*)args)->serverInstance;
 		serverInstance->listenSocket = ((SocketContext*)args)->connSocket;
+		listen(serverInstance->listenSocket, 2500);
 		delete (SocketContext*)args;
-		listen(serverInstance->listenSocket, 20);
 
 		sockaddr_in senderAddr;
 		unsigned int senderAddrSize = sizeof senderAddr;
@@ -69,7 +72,10 @@ void* TcpServer::actualStartListening(void* args)
 
             if (connSock == -1)
             {
-                if (serverInstance->stop) return NULL;
+                if (serverInstance->stop.load())
+                {
+                    return NULL;
+                }
                 else continue;
             }
 
@@ -90,10 +96,12 @@ void* TcpServer::handleConnectionHelper(void* args)
 	server->handleConnection(ctx->connSocket, ctx->connAddr);
 	delete ctx;
 	server->finishThread();
+	return NULL;
 }
 
 void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
 {
+    //++debugThrCount;
 	int readLength;
 	uint8_t* buf;
 	P2PMessage msg;
@@ -105,7 +113,6 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
                 sizeof(timeout));
 
 	readLength = recv(sock, (void*)&msg, sizeof(msg), 0);
-	std::cout << "Read: " << readLength << std::endl;
     if(checkReceiveIssues(readLength, senderAddr, sizeof(msg)))
     {
         return;
@@ -117,16 +124,15 @@ void TcpServer::handleConnection(int sock, in_addr_t senderAddr)
 
 	uint32_t remainingSize = msg.getAdditionalDataSize();
 	uint8_t* streamPointer = (uint8_t*)(buf + sizeof(msg));
+
 	while(remainingSize > 0)
     {
         readLength = recv(sock, streamPointer, remainingSize, 0);
-        std::cout << "Read: " << readLength << std::endl;
         if(checkReceiveIssues(readLength, senderAddr))
         {
             delete[] buf;
             return;
         }
-        std::cout << "Post check issues: " << std::endl;
         remainingSize -= readLength;
         streamPointer += readLength;
     }
@@ -183,10 +189,12 @@ void* TcpServer::actualSendDataHelper(void* args)
 	delete ctx->args;
 	delete ctx;
 	server->finishThread();
+	return NULL;
 }
 
 void TcpServer::actualSendData(uint8_t* data, uint32_t size, in_addr_t toWhom)
 {
+    Mutex debugMutex;
 	sockaddr_in sendAddr;
 	sendAddr.sin_family = AF_INET;
 	sendAddr.sin_port = htons(LISTEN_PORT);
@@ -203,14 +211,13 @@ void TcpServer::actualSendData(uint8_t* data, uint32_t size, in_addr_t toWhom)
 	}
 
 	struct timeval timeout;
-    timeout.tv_sec = 10;
+    timeout.tv_sec = 5;
     timeout.tv_usec = 0;
 
     setsockopt(sendSocket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
                 sizeof(timeout));
 
 	int status = connect(sendSocket, (sockaddr*) &sendAddr, sizeof(sendAddr));
-
 	if (status == -1)
 	{
 		close(sendSocket);
@@ -226,12 +233,10 @@ void TcpServer::actualSendData(uint8_t* data, uint32_t size, in_addr_t toWhom)
 						SocketOperation::Status::SendFailed, toWhom);
         errorCallback(op);
     }
-
 	close(sendSocket);
 	return;
 }
 
 TcpServer::~TcpServer()
 {
-
 }

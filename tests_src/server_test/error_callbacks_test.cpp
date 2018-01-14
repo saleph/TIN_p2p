@@ -38,18 +38,22 @@ BOOST_AUTO_TEST_CASE(checkCantConnectCallback)
     usleep(10000);
 
     BOOST_TEST(Config::operation.status == SocketOperation::Status::CantConnect);
-
+    delete[] data;
 }
 
 BOOST_AUTO_TEST_CASE(checkReceiveFailCallback)
 {
     TcpServer server(&Config::tcpResolveCallback, &Config::errorCallback);
 
-    usleep(10000);
-
     server.startListening();
 
+    usleep(10000);
+
     uint8_t* data = new uint8_t[50];
+    for (int i = 0; i < 50; ++i)
+    {
+        data[i] = rand() % 256;
+    }
     server.sendData(data, 1, inet_addr("127.0.0.1"));
 
     usleep(200000);
@@ -65,6 +69,7 @@ BOOST_AUTO_TEST_CASE(checkReceiveFailCallback)
     usleep(200000);
     server.stopListening();
     BOOST_TEST(Config::operation.status == SocketOperation::Status::ReceiveFailed);
+    delete[] data;
 }
 
 BOOST_AUTO_TEST_SUITE_END();

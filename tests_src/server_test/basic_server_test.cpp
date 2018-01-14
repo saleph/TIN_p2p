@@ -1,5 +1,6 @@
 #include <boost/test/unit_test.hpp>
 #include <random>
+#include <iostream>
 
 #include "p2pMessage.hpp"
 #include "tcp_server.hpp"
@@ -20,9 +21,11 @@ struct MyConfig
     static int tcpLongCallbackCount;
     static int udpLongCallbackCount;
     static int udpResolveCallbackCount;
+    static std::map <int, std::tuple<bool, uint8_t*, uint32_t>> idToResponseMap;
 
     static Mutex mTcp;
     static Mutex mUdp;
+    static Mutex mapMutex;
 
     static void tcpResolveCallback(uint8_t* x, uint32_t s, SocketOperation op)
     {
@@ -37,7 +40,11 @@ struct MyConfig
     {
         usleep(500000);
         mTcp.lock();
+        //std::cout << "CALLBACK BY THREAD " << pthread_self() << "BEFORE " <<
+         //MyConfig::tcpLongCallbackCount << std::endl;
         ++MyConfig::tcpLongCallbackCount;
+        //std::cout << "AFTER "<<
+         //MyConfig::tcpLongCallbackCount << std::endl;
         mTcp.unlock();
         return;
     }
@@ -60,6 +67,32 @@ struct MyConfig
         return;
     }
 
+    static void udpMapResponse(uint8_t* x, uint32_t s, SocketOperation op)
+    {
+        uint32_t id = *( (uint32_t*)(x +sizeof(P2PMessage)) );
+        uint8_t* copied = new uint8_t[s];
+        memcpy(copied, x, s);
+
+        mapMutex.lock();
+        idToResponseMap[id] = std::make_tuple(true, copied, s);
+        mapMutex.unlock();
+
+        return;
+    }
+
+    static void tcpMapResponse(uint8_t* x, uint32_t s, SocketOperation op)
+    {
+        uint32_t id = *( (uint32_t*)(x +sizeof(P2PMessage)) );
+        uint8_t* copied = new uint8_t[s];
+        memcpy(copied, x, s);
+
+        mapMutex.lock();
+        idToResponseMap[id] = std::make_tuple(false, copied, s);
+        mapMutex.unlock();
+
+        return;
+    }
+
     static void errorCallback(SocketOperation s)
     {
         ++MyConfig::errorCallbackCount;
@@ -69,6 +102,7 @@ struct MyConfig
 
 Mutex MyConfig::mTcp;
 Mutex MyConfig::mUdp;
+Mutex MyConfig::mapMutex;
 int MyConfig::errorCallbackCount = 0;
 int MyConfig::tcpResolveCallbackCount = 0;
 int MyConfig::udpResolveCallbackCount = 0;
@@ -76,6 +110,7 @@ int MyConfig::tcpLongCallbackCount = 0;
 int MyConfig::udpLongCallbackCount = 0;
 uint32_t MyConfig::receivedDataSize = 0;
 uint8_t* MyConfig::receivedData = NULL;
+std::map <int, std::tuple<bool, uint8_t*, uint32_t> >MyConfig::idToResponseMap;
 
 BOOST_TEST_GLOBAL_FIXTURE( MyConfig );
 
@@ -107,6 +142,7 @@ BOOST_AUTO_TEST_CASE(checkTcpServerWorksAtAll)
 
     server->stopListening();
 
+    delete[] data;
     delete[] MyConfig::receivedData;
 
     delete server;
@@ -136,6 +172,7 @@ BOOST_AUTO_TEST_CASE(checkUdpServerWorksAtAll)
 
     server->stopListening();
 
+    delete[] data;
     delete[] MyConfig::receivedData;
 
     delete server;
@@ -143,10 +180,14 @@ BOOST_AUTO_TEST_CASE(checkUdpServerWorksAtAll)
 
 BOOST_AUTO_TEST_CASE(checkServersWaitForDispatchersToFinish)
 {
+    MyConfig::tcpResolveCallbackCount = 0;
     TcpServer tcp(&MyConfig::tcpLongCallback, &MyConfig::errorCallback);
     UdpServer udp(&MyConfig::udpLongCallback);
     tcp.startListening();
     udp.startListening();
+
+    usleep(50000);
+    int num_sends = 100;
 
     P2PMessage msg;
     msg.setMessageType(MessageType::UPLOAD_FILE);
@@ -159,25 +200,107 @@ BOOST_AUTO_TEST_CASE(checkServersWaitForDispatchersToFinish)
     {
         data[i] = rand() % 256;
     }
-    for(int i = 0; i < 24; ++i)
+    for(int i = 0; i < num_sends; ++i)
     {
         udp.broadcast(data, sentDataSize);
         tcp.sendData(data, sentDataSize, inet_addr("127.0.0.1"));
     }
 
-    usleep(100000);
+    BOOST_TEST(MyConfig::tcpLongCallbackCount < num_sends);
+    BOOST_TEST(MyConfig::udpLongCallbackCount < num_sends);
 
-    BOOST_TEST(MyConfig::tcpLongCallbackCount < 24);
-    BOOST_TEST(MyConfig::udpLongCallbackCount < 24);
-
+    usleep(50000);
     tcp.stopListening();
     udp.stopListening();
 
-    BOOST_TEST(MyConfig::tcpLongCallbackCount == 24);
-    BOOST_TEST(MyConfig::udpLongCallbackCount == 24);
+    BOOST_TEST(MyConfig::tcpLongCallbackCount == num_sends);
+    BOOST_TEST(MyConfig::udpLongCallbackCount == num_sends);
 
     delete[] data;
     //while(1);
+}
+
+BOOST_AUTO_TEST_CASE(checkMultipleRecipientsGetExpectedResponses)
+{
+    srand(time(NULL));
+    TcpServer tcp(&MyConfig::tcpMapResponse, &MyConfig::errorCallback);
+    UdpServer udp(&MyConfig::udpMapResponse);
+    tcp.startListening();
+    udp.startListening();
+
+    std::map<int, std::tuple<bool, uint8_t*, uint32_t> > expectedIdToResponseMap;
+
+    uint32_t num_sends = 100;
+    uint8_t* buf;
+    uint32_t dataSize;
+    bool isUdp;
+    P2PMessage msg;
+
+    usleep(50000);
+
+    for (uint32_t id = 1; id <= num_sends; ++id)
+    {
+        isUdp = rand() % 2;
+        dataSize = 50 + rand() % 900;
+
+        msg.setMessageType(MessageType::UPLOAD_FILE);
+        msg.setAdditionalDataSize(dataSize);
+
+        buf = new uint8_t[sizeof(P2PMessage) + dataSize];
+
+        memcpy(buf, &msg, sizeof(P2PMessage));
+        memcpy(buf + sizeof(P2PMessage), &id, sizeof(uint32_t));
+
+        for (uint8_t* bufpointer = buf + sizeof(P2PMessage) + sizeof(uint32_t);
+             bufpointer != buf + sizeof(P2PMessage) + dataSize;
+             ++bufpointer)
+        {
+            *bufpointer = rand() % 256;
+        }
+
+        expectedIdToResponseMap[id] = std::make_tuple(isUdp, buf, dataSize + sizeof(P2PMessage));
+
+        if (isUdp)
+        {
+            udp.broadcast(buf, dataSize + sizeof(P2PMessage));
+        }
+        else
+        {
+            tcp.sendData(buf, dataSize + sizeof(P2PMessage), inet_addr("127.0.0.1"));
+        }
+    }
+
+    usleep(50000);
+    tcp.stopListening();
+    udp.stopListening();
+
+    BOOST_TEST(MyConfig::idToResponseMap.size() == expectedIdToResponseMap.size());
+
+    for (int id = 1; id <= num_sends; ++id )
+    {
+        std::tuple <bool, uint8_t*, uint32_t> receivedTuple, expectedTuple;
+        receivedTuple = MyConfig::idToResponseMap[id];
+        expectedTuple = expectedIdToResponseMap[id];
+
+
+        bool receivedUdp = std::get<0>(receivedTuple);
+        uint8_t* receivedData = std::get<1>(receivedTuple);
+        uint32_t receivedSize = std::get<2>(receivedTuple);
+
+        bool expectedUdp = std::get<0>(expectedTuple);
+        uint8_t* expectedData = std::get<1>(expectedTuple);
+        uint32_t expectedSize = std::get<2>(expectedTuple);
+
+        BOOST_TEST(receivedUdp == expectedUdp);
+        BOOST_TEST(receivedSize == expectedSize);
+
+        for (int i = 0; i < receivedSize; ++i)
+        {
+            BOOST_TEST(expectedData[i] == receivedData[i]);
+        }
+        delete[] receivedData;
+        delete[] expectedData;
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END();

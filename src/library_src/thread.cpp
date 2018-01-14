@@ -1,5 +1,6 @@
 #include "thread.hpp"
 #include <signal.h>
+#include <stdio.h>
 
 Thread::Thread(void * function_pointer(void *), void * arg, void ** retval) {
     pthread_create(&thread_id,NULL,function_pointer,arg);
@@ -8,7 +9,7 @@ Thread::Thread(void * function_pointer(void *), void * arg, void ** retval) {
 }
 
 void * Thread::get() {
-    pthread_join(thread_id,rv);
+    pthread_join(thread_id, rv);
     return rv == NULL ? NULL : *rv;
 }
 
