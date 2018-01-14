@@ -66,6 +66,7 @@ void UdpServer::startListening()
 	SocketContext* ctx = new SocketContext((Server*)this, listenSocket, 0);
 
 	listenerThread = new Thread(&UdpServer::actualStartListening, (void*)ctx, NULL);
+	usleep(50000);
 }
 
 void* UdpServer::actualStartListening(void* ctx)

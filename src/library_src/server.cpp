@@ -28,6 +28,7 @@ void Server::finishThread()
 
 void Server::stopListening()
 {
+    usleep(50000);
     stopMutex.lock();
     stop = true;
     shutdown(listenSocket, SHUT_RDWR);

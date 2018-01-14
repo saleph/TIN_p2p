@@ -53,6 +53,7 @@ void TcpServer::startListening()
 
 	SocketContext* ctx = new SocketContext(this, listenSocket, 0);
 	listenerThread = new Thread(&TcpServer::actualStartListening, (void*) ctx, NULL);
+	usleep(50000);
 }
 
 void* TcpServer::actualStartListening(void* args)

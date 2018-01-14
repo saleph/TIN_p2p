@@ -118,7 +118,6 @@ BOOST_AUTO_TEST_CASE(checkTcpServerWorksAtAll)
 {
     TcpServer* server = new TcpServer(&MyConfig::tcpResolveCallback, &MyConfig::errorCallback);
     server->startListening();
-    usleep(100000);
 
     P2PMessage msg;
     msg.setMessageType(MessageType::UPLOAD_FILE);
@@ -152,7 +151,6 @@ BOOST_AUTO_TEST_CASE(checkUdpServerWorksAtAll)
 {
     UdpServer* server = new UdpServer(&MyConfig::udpResolveCallback);
     server->startListening();
-    usleep(100000);
 
     uint32_t sentDataSize = 400;
     uint8_t* data = new uint8_t[sentDataSize];
@@ -186,7 +184,6 @@ BOOST_AUTO_TEST_CASE(checkServersWaitForDispatchersToFinish)
     tcp.startListening();
     udp.startListening();
 
-    usleep(50000);
     int num_sends = 100;
 
     P2PMessage msg;
@@ -209,7 +206,6 @@ BOOST_AUTO_TEST_CASE(checkServersWaitForDispatchersToFinish)
     BOOST_TEST(MyConfig::tcpLongCallbackCount < num_sends);
     BOOST_TEST(MyConfig::udpLongCallbackCount < num_sends);
 
-    usleep(50000);
     tcp.stopListening();
     udp.stopListening();
 
