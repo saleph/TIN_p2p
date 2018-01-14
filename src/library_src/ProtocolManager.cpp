@@ -36,7 +36,23 @@ void p2p::util::processUdpMsg(uint8_t *data, uint32_t size, SocketOperation oper
 
 void p2p::util::initProcessingFunctions() {
     messageProcessors[MessageType::HELLO] = [] (const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+		P2PMessage message;
+		message.setMessageType(MessageType::HELLO_REPLY);
 
+		FileDescriptor descriptorsTab[util::localDescriptors.size()];
+		std::copy(util::localDescriptors.begin(), util::localDescriptors.end(), descriptorsTab);
+
+		const uint32_t additionalDataSize = sizeof(descriptorsTab);
+		message.setAdditionalDataSize(additionalDataSize);
+
+		memcpy(data, &message, sizeof(P2PMessage));
+		data += sizeof(P2PMessage);
+
+		memcpy(data, descriptorsTab, sizeof(descriptorsTab));
+
+		size = sizeof(P2PMessage) + additionalSize;
+
+		util::udpServer->broadcast(data, size);
     };
 
     messageProcessors[MessageType::HELLO_REPLY] = [] (const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
