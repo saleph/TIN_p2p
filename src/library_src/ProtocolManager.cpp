@@ -3,6 +3,19 @@
 #include "ProtocolManager.hpp"
 
 
+// definitions HAVE TO BE THERE
+// otherwise - multiple definitions error
+namespace p2p {
+    namespace util {
+        std::unordered_map<MessageType, std::function<void(const uint8_t *, uint32_t, in_addr_t)>> messageProcessors;
+        std::shared_ptr<TcpServer> tcpServer;
+        std::shared_ptr<UdpServer> udpServer;
+
+        std::vector<FileDescriptor> localDescriptors;
+        std::vector<FileDescriptor> networkDescriptors;
+    }
+}
+
 void p2p::initialize() {
     util::tcpServer = std::make_shared<TcpServer>(&util::processTcpMsg, &util::processTcpError);
     util::udpServer = std::make_shared<UdpServer>(&util::processUdpMsg);
@@ -36,23 +49,25 @@ void p2p::util::processUdpMsg(uint8_t *data, uint32_t size, SocketOperation oper
 
 void p2p::util::initProcessingFunctions() {
     messageProcessors[MessageType::HELLO] = [] (const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-		P2PMessage message;
+		P2PMessage message = {};
 		message.setMessageType(MessageType::HELLO_REPLY);
 
-		FileDescriptor descriptorsTab[util::localDescriptors.size()];
-		std::copy(util::localDescriptors.begin(), util::localDescriptors.end(), descriptorsTab);
-
-		const uint32_t additionalDataSize = sizeof(descriptorsTab);
+		unsigned long additionalDataSize = localDescriptors.size() * sizeof(FileDescriptor);
 		message.setAdditionalDataSize(additionalDataSize);
 
-		memcpy(data, &message, sizeof(P2PMessage));
-		data += sizeof(P2PMessage);
+        // create a vector with size of the whole message (empty)
+        std::vector<uint8_t> buffer(additionalDataSize + sizeof(P2PMessage));
 
-		memcpy(data, descriptorsTab, sizeof(descriptorsTab));
+        // write into underlying array P2Pmessage
+		memcpy(buffer.data(), &message, sizeof(P2PMessage));
 
-		size = sizeof(P2PMessage) + additionalSize;
+        // write descriptors
+		memcpy(buffer.data() + sizeof(P2PMessage),
+               (uint8_t*)localDescriptors.data(),
+               localDescriptors.size() * sizeof(FileDescriptor));
 
-		util::tcpServer.sendData(data, size, sourceAdress);
+        // send message
+		util::tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
     };
 
     messageProcessors[MessageType::HELLO_REPLY] = [] (const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
