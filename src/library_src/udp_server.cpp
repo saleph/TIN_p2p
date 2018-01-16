@@ -65,7 +65,8 @@ void UdpServer::startListening()
 
 	SocketContext* ctx = new SocketContext((Server*)this, listenSocket, 0);
 
-	Thread t(&UdpServer::actualStartListening, (void*)ctx, NULL);
+	listenerThread = new Thread(&UdpServer::actualStartListening, (void*)ctx, NULL);
+	usleep(50000);
 }
 
 void* UdpServer::actualStartListening(void* ctx)
@@ -85,13 +86,23 @@ void* UdpServer::actualStartListening(void* ctx)
         rcvlen = recvfrom(mySocket, buf, BUF_SIZE, 0, (sockaddr*)&sender, &slen);
         if (rcvlen == 0)
         {
-            if (server->stop) return NULL;
+            if (server->stop.load())
+            {
+                delete[] buf;
+                return NULL;
+            }
             else continue;
+        }
+
+        if (sender.sin_addr.s_addr = Server::getLocalhostIp() && server->disableSelfBroadcasts)
+        {
+            continue;
         }
 
         HandleBroadcastArgs* args = new HandleBroadcastArgs(server, buf, rcvlen, sender.sin_addr.s_addr);
 		if(!server->addDispatcherThread(&UdpServer::handleBroadcastReceive, (void*)args , NULL))
         {
+            delete[] buf;
             delete args;
             return NULL;
         }
@@ -109,9 +120,14 @@ void* UdpServer::handleBroadcastReceive(void* handleArgs)
 	delete[] args->data;
 	delete args;
 	server->finishThread();
+	return NULL;
+}
+
+void UdpServer::enableSelfBroadcasts()
+{
+    disableSelfBroadcasts = false;
 }
 
 UdpServer::~UdpServer()
 {
-
 }

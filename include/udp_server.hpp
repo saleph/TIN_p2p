@@ -12,6 +12,7 @@ class UdpServer : public Server
 {
 	const int PORT = 2000;
 	int broadcastEnable = 1;
+	bool disableSelfBroadcasts = true;
 	sockaddr_in broadcastAddr;
 
 	struct HandleBroadcastArgs
@@ -35,6 +36,7 @@ public:
 			SocketOperation op));
     // starts thread that will run callbacks in new threads if broadcast is received
 	void startListening();
+	void enableSelfBroadcasts();
 	// sends broadcast from current thread
 	void broadcast(uint8_t* bytes, uint32_t size);
 	~UdpServer();

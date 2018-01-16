@@ -3,6 +3,7 @@
 #define INCLUDE_SERVER_HPP_
 
 #include <vector>
+#include <atomic>
 
 #include "socket_operation.hpp"
 #include "thread.hpp"
@@ -12,9 +13,11 @@ class Server
 {
 protected:
 	std::vector <Thread> connectionThreads;
+	Thread* listenerThread;
 	Mutex threadsVecMutex;
+	Mutex stopMutex;
 	int listenSocket;
-	bool stop = false;
+	std::atomic<bool> stop;
 
 	struct SocketContext
 	{
@@ -36,6 +39,7 @@ public:
 	virtual void startListening() = 0;
 	void stopListening();
 	virtual ~Server();
+	static in_addr_t getLocalhostIp();
 };
 
 

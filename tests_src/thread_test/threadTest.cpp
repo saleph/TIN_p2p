@@ -72,5 +72,4 @@ BOOST_AUTO_TEST_CASE(killThreadTest)
     thread->get();
     BOOST_CHECK(signalConfirmed == true);
 }
-
 */
