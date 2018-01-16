@@ -22,6 +22,7 @@ const size_t MAX_FILENAME_LEN = 255;
 /// Automatically manages the size and MD5 hash of the file during construction.
 class FileDescriptor {
 public:
+	explicit FileDescriptor() = default;
 	explicit FileDescriptor(const std::string& filename);
 
 	const Md5Hash& getMd5() const;
@@ -39,12 +40,12 @@ private:
 	static uint32_t obtainFileSize(const char* fn);
 	void setName(const std::string& name);
 
-	char name[MAX_FILENAME_LEN+1];
+	char name[MAX_FILENAME_LEN+1]{};
 	Md5Hash md5;
-	uint32_t size;
-	time_t uploadTime;
-	in_addr_t ownerIp;
-	in_addr_t holderIp;
+	uint32_t size{};
+	time_t uploadTime{};
+	in_addr_t ownerIp{};
+	in_addr_t holderIp{};
 };
 
 

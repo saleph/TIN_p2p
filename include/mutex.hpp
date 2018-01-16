@@ -14,5 +14,4 @@ public:
 	~Mutex();
 };
 
-
 #endif /* INCLUDE_MUTEX_HPP_ */

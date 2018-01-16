@@ -13,14 +13,8 @@
 #include <vector>
 
 namespace p2p {
-    namespace util {
-        void processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
-        void processTcpError(SocketOperation operation);
-        void processUdpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
-        void initProcessingFunctions();
-    };
-
-    void initialize();
+    void startSession();
+    void closeSession();
 };
 
 
