@@ -124,6 +124,8 @@ void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
 }
 
 void p2p::util::discardDescriptor(FileDescriptor &descriptor) {
+    descriptor.makeUnvalid();
+
     P2PMessage message{};
     message.setMessageType(MessageType::DISCARD_DESCRIPTOR);
     message.setAdditionalDataSize(sizeof(FileDescriptor));
@@ -209,8 +211,13 @@ void p2p::util::initProcessingFunctions() {
     };
 
     messageProcessors[MessageType::HELLO_REPLY] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        if (sourceAddress == udpServer->getLocalhostIp()) {
+            // our broadcast, skip
+            return;
+        }
         BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY from: " << ntohl(sourceAddress) << " "
                                  << size / sizeof(FileDescriptor) << " descriptors received";
+
         std::vector<FileDescriptor> buffer(size / sizeof(FileDescriptor));
 
         memcpy(buffer.data(), data, size);
@@ -220,11 +227,28 @@ void p2p::util::initProcessingFunctions() {
     };
 
     messageProcessors[MessageType::DISCONNECTING] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-
+        Guard guard(mutex);
+        // mark descriptors of disconnecting node as discarded
+        for (auto &&descriptor : networkDescriptors) {
+            if (descriptor.getHolderIp() == sourceAddress) {
+                descriptor.makeUnvalid();
+            }
+        }
     };
 
     messageProcessors[MessageType::CONNECTION_LOST] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        if (size != sizeof(in_addr_t)) {
+            throw std::runtime_error("CONNECTION_LOST: additional data does not contain IP address of the lost node");
+        }
+        // only additional information is lostNode IP
+        in_addr_t lostNodeAddress = *(in_addr_t*)data;
+        BOOST_LOG_TRIVIAL(debug) << ">>> CONNECTION_LOST: node " << lostNodeAddress;
 
+        Guard guard(mutex);
+        std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
+                       [lostNodeAddress](const FileDescriptor &fileDescriptor){
+                           return fileDescriptor.getHolderIp() == lostNodeAddress;
+                       });
     };
 
     messageProcessors[MessageType::CMD_REFUSED] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {

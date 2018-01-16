@@ -28,6 +28,9 @@ public:
 	const Md5Hash& getMd5() const;
 	std::string getName() const;
 	uint32_t getSize() const;
+	void makeValid();
+	void makeUnvalid();
+	bool isValid() const;
 	in_addr_t getHolderIp() const;
 	void setHolderIp(in_addr_t holderIp);
 	in_addr_t getOwnerIp() const;
@@ -46,6 +49,7 @@ private:
 	time_t uploadTime{};
 	in_addr_t ownerIp{};
 	in_addr_t holderIp{};
+	bool valid;
 };
 
 

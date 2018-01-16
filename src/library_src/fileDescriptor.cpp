@@ -62,3 +62,15 @@ void FileDescriptor::setName(const std::string& name) {
 	}
 	strcpy(this->name, name.c_str());
 }
+
+void FileDescriptor::makeValid() {
+	valid = true;
+}
+
+void FileDescriptor::makeUnvalid() {
+	valid = false;
+}
+
+bool FileDescriptor::isValid() const {
+	return valid;
+}
