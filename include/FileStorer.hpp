@@ -14,7 +14,7 @@ public:
     { }
 
     void storeFile(const std::vector<uint8_t> &content) {
-        std::ofstream file("p2pfiles/" + filename, std::ios_base::out);
+        std::ofstream file(filename, std::ios_base::out);
         file << (char*)content.data();
         file.close();
     }
