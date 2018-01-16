@@ -94,7 +94,7 @@ void* UdpServer::actualStartListening(void* ctx)
             else continue;
         }
 
-        if (sender.sin_addr.s_addr = Server::getLocalhostIp() && server->disableSelfBroadcasts)
+        if (sender.sin_addr.s_addr == Server::getLocalhostIp() && server->isSelfBroadcastDisable)
         {
             continue;
         }
@@ -125,9 +125,13 @@ void* UdpServer::handleBroadcastReceive(void* handleArgs)
 
 void UdpServer::enableSelfBroadcasts()
 {
-    disableSelfBroadcasts = false;
+    isSelfBroadcastDisable = false;
 }
 
 UdpServer::~UdpServer()
 {
+}
+
+void UdpServer::disableSelfBroadcasts() {
+    isSelfBroadcastDisable = true;
 }
