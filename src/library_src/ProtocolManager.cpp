@@ -180,7 +180,6 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
 
 std::vector<uint8_t> p2p::util::getFileContent(FileDescriptor &descriptor) {
     FileLoader loader(descriptor.getName());
-    loader.checkFileHashEquals(descriptor.getMd5());
     return loader.getContent();
 }
 

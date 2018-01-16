@@ -12,11 +12,10 @@
 
 class FileLoader {
     std::string filename;
-    std::vector<uint8_t> fileContent;
 public:
     explicit FileLoader(std::string file);
 
-    std::vector<uint8_t> &getContent();
+    std::vector<uint8_t> getContent();
 };
 
 
