@@ -3,8 +3,10 @@
 
 
 int main() {
-    p2p::startSession();
     int i;
+    p2p::startSession();
     std::cin >> i;
-    p2p::closeSession();
+    p2p::uploadFile("example.txt");
+    std::cin >> i;
+    p2p::endSession();
 }

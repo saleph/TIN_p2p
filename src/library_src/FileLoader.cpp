@@ -6,7 +6,7 @@ FileLoader::FileLoader(std::string file)
 }
 
 std::vector<uint8_t> FileLoader::getContent() {
-    std::ifstream t(filename);
+    std::ifstream t("p2pfiles/" + filename);
     std::string fileAsString((std::istreambuf_iterator<char>(t)),
                              std::istreambuf_iterator<char>());
 

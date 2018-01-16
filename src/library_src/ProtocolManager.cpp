@@ -41,10 +41,14 @@ namespace p2p {
         std::vector<uint8_t> getFileContent(FileDescriptor &descriptor);
 
 
+        void publishDescriptor(FileDescriptor &descriptor);
+
+        void uploadFile(FileDescriptor &descriptor);
+
     }
 }
 
-void p2p::closeSession() {
+void p2p::endSession() {
     util::tcpServer->stopListening();
     util::udpServer->stopListening();
     util::tcpServer.reset();
@@ -56,6 +60,7 @@ void p2p::startSession() {
     util::initProcessingFunctions();
     util::tcpServer = std::make_shared<TcpServer>(&util::processTcpMsg, &util::processTcpError);
     util::udpServer = std::make_shared<UdpServer>(&util::processUdpMsg);
+    util::udpServer->enableSelfBroadcasts();
     util::tcpServer->startListening();
     util::udpServer->startListening();
     util::joinToNetwork();
@@ -114,7 +119,7 @@ void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
     for (auto &&localDescriptor : localDescriptors) {
         discardDescriptor(localDescriptor);
     }
-    BOOST_LOG_TRIVIAL(debug) << "### Local "<< localDescriptors.size() << " descriptors discarded";
+    BOOST_LOG_TRIVIAL(debug) << "### Local " << localDescriptors.size() << " descriptors discarded";
 
     for (auto &&localDescriptor : localDescriptors) {
         in_addr_t nodeToSend = findLeastLoadedNode();
@@ -139,6 +144,10 @@ void p2p::util::discardDescriptor(FileDescriptor &descriptor) {
 }
 
 in_addr_t p2p::util::findLeastLoadedNode() {
+    if (networkDescriptors.empty()) {
+        return tcpServer->getLocalhostIp();
+    }
+
     std::unordered_map<in_addr_t, int> nodesLoad;
 
     // count uses
@@ -146,12 +155,12 @@ in_addr_t p2p::util::findLeastLoadedNode() {
         nodesLoad[descriptor.getHolderIp()]++;
     }
 
-    // find max element
+    // find min element
     auto mapElement = std::min_element(nodesLoad.begin(), nodesLoad.end(),
-                              [](const std::pair<in_addr_t, int> &p1, const std::pair<in_addr_t, int> &p2) {
-                                  return p1.second < p2.second;
-                              });
-
+                                       [](const std::pair<in_addr_t, int> &p1,
+                                          const std::pair<in_addr_t, int> &p2) {
+                                           return p1.second < p2.second;
+                                       });
     return mapElement->first;
 }
 
@@ -170,9 +179,9 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
     std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
 
     // prepare message
-    memcpy(buffer.data(), (uint8_t*)&message, sizeof(P2PMessage));
+    memcpy(buffer.data(), (uint8_t *) &message, sizeof(P2PMessage));
     // put descriptor
-    memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t*)&descriptor, sizeof(FileDescriptor));
+    memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t *) &descriptor, sizeof(FileDescriptor));
     // put file content
     memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
 
@@ -184,6 +193,84 @@ std::vector<uint8_t> p2p::util::getFileContent(FileDescriptor &descriptor) {
     FileLoader loader(descriptor.getName());
     return loader.getContent();
 }
+
+void p2p::uploadFile(const std::string &name) {
+    // create new descriptor (autofill MD5 and its size)
+    FileDescriptor newDescriptor(name);
+
+    // set upload time
+    newDescriptor.setUploadTime(std::time(nullptr));
+
+    in_addr_t thisHostAddress = util::tcpServer->getLocalhostIp();
+    // set owner id as this host
+    newDescriptor.setOwnerIp(thisHostAddress);
+
+    // find least loaded node
+    in_addr_t leastLoadNodeAddress = util::findLeastLoadedNode();
+
+    // set holder IP
+    newDescriptor.setHolderIp(leastLoadNodeAddress);
+
+    // make descriptor valid
+    newDescriptor.makeValid();
+
+    if (leastLoadNodeAddress == thisHostAddress) {
+        // we are the least load node - only publish the descriptor
+        util::publishDescriptor(newDescriptor);
+        BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on this host";
+
+        Guard guard(util::mutex);
+        util::localDescriptors.push_back(newDescriptor);
+        return;
+    }
+
+    util::uploadFile(newDescriptor);
+    BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName()
+                             << " saved in node " << leastLoadNodeAddress;
+}
+
+void p2p::util::publishDescriptor(FileDescriptor &descriptor) {
+    P2PMessage message{};
+    message.setMessageType(MessageType::NEW_FILE);
+    message.setAdditionalDataSize(sizeof(FileDescriptor));
+
+    // prepare buffer
+    std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
+
+    // put into buffer P2Pmessage and new's file's descriptor
+    memcpy(buffer.data(), &message, sizeof(P2PMessage));
+    memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
+
+    udpServer->broadcast(buffer.data(), buffer.size());
+}
+
+void p2p::util::uploadFile(FileDescriptor &descriptor) {
+    P2PMessage message{};
+    message.setMessageType(MessageType::UPLOAD_FILE);
+    auto fileContent = getFileContent(descriptor);
+
+    // set additional data size to size of descritor + content
+    message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
+
+    // prepare buffer
+    std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
+
+    memcpy(buffer.data(), &message, sizeof(P2PMessage));
+    memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
+    memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
+
+    in_addr_t holderNode = descriptor.getHolderIp();
+    tcpServer->sendData(buffer.data(), buffer.size(), holderNode);
+}
+
+void p2p::getFile(const std::string &name) {
+
+}
+
+void p2p::deleteFile(const std::string &name) {
+
+}
+
 
 void p2p::util::initProcessingFunctions() {
     messageProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
@@ -220,6 +307,7 @@ void p2p::util::initProcessingFunctions() {
 
         std::vector<FileDescriptor> buffer(size / sizeof(FileDescriptor));
 
+        // put descriptors
         memcpy(buffer.data(), data, size);
 
         Guard guard(mutex);
@@ -234,6 +322,7 @@ void p2p::util::initProcessingFunctions() {
                 descriptor.makeUnvalid();
             }
         }
+        BOOST_LOG_TRIVIAL(debug) << "<<< DISCONNECTING: node " << sourceAddress << " start disconnecting";
     };
 
     messageProcessors[MessageType::CONNECTION_LOST] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
@@ -241,12 +330,12 @@ void p2p::util::initProcessingFunctions() {
             throw std::runtime_error("CONNECTION_LOST: additional data does not contain IP address of the lost node");
         }
         // only additional information is lostNode IP
-        in_addr_t lostNodeAddress = *(in_addr_t*)data;
-        BOOST_LOG_TRIVIAL(debug) << ">>> CONNECTION_LOST: node " << lostNodeAddress;
+        in_addr_t lostNodeAddress = *(in_addr_t *) data;
+        BOOST_LOG_TRIVIAL(debug) << "<<< CONNECTION_LOST: node " << lostNodeAddress;
 
         Guard guard(mutex);
         std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                       [lostNodeAddress](const FileDescriptor &fileDescriptor){
+                       [lostNodeAddress](const FileDescriptor &fileDescriptor) {
                            return fileDescriptor.getHolderIp() == lostNodeAddress;
                        });
     };
@@ -256,23 +345,34 @@ void p2p::util::initProcessingFunctions() {
     };
 
     messageProcessors[MessageType::NEW_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor newFileDescriptor(nullptr);
-        memcpy(&newFileDescriptor, data, sizeof(FileDescriptor));
+        if (size != sizeof(FileDescriptor)) {
+            throw std::runtime_error("NEW_FILE: received data is not a descriptor");
+        }
+        FileDescriptor newFileDescriptor = *(FileDescriptor *) data;
 
+        BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
+                                 << " md5: " << newFileDescriptor.getMd5().getHash();
+
+        Guard guard(mutex);
         networkDescriptors.push_back(newFileDescriptor);
     };
 
     messageProcessors[MessageType::REVOKE_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor revokedFileDescriptor(nullptr);
-        memcpy(&revokedFileDescriptor, data, sizeof(FileDescriptor));
-
-        for (std::vector<FileDescriptor>::const_iterator i = networkDescriptors.begin();
-             i != networkDescriptors.end(); ++i) {
-            if (i->getName() == revokedFileDescriptor.getName()) {
-                networkDescriptors.erase(i);
-                break;
-            }
+        if (size != sizeof(FileDescriptor)) {
+            throw std::runtime_error("REVOKE_FILE: received data is not a descriptor");
         }
+        FileDescriptor revokedFileDescriptor = *(FileDescriptor *) data;
+
+        BOOST_LOG_TRIVIAL(debug) << "<<< REVOKE_FILE: " << revokedFileDescriptor.getName() << " "
+                                 << " MD5: " << revokedFileDescriptor.getMd5().getHash();
+
+        Md5Hash revokedFileHash = revokedFileDescriptor.getMd5();
+
+        Guard guard(mutex);
+        networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                                [&revokedFileHash](const FileDescriptor &fileDescriptor) {
+                                                    return fileDescriptor.getMd5() == revokedFileHash;
+                                                }));
     };
 
     messageProcessors[MessageType::DISCARD_DESCRIPTOR] = [](const uint8_t *data, uint32_t size,
@@ -284,9 +384,9 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor updatedFileDescriptor(nullptr);
         memcpy(&updatedFileDescriptor, data, sizeof(FileDescriptor));
 
-        for (int i = 0; i < networkDescriptors.size(); i++) {
-            if (networkDescriptors[i].getName() == updatedFileDescriptor.getName()) {
-                networkDescriptors[i] = updatedFileDescriptor;
+        for (auto &&networkDescriptor : networkDescriptors) {
+            if (networkDescriptor.getMd5() == updatedFileDescriptor.getMd5()) {
+                networkDescriptor = updatedFileDescriptor;
                 break;
             }
         }

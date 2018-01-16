@@ -14,7 +14,10 @@
 
 namespace p2p {
     void startSession();
-    void closeSession();
+    void endSession();
+    void uploadFile(const std::string &name);
+    void getFile(const std::string &name);
+    void deleteFile(const std::string &name);
 };
 
 
