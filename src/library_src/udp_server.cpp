@@ -94,6 +94,11 @@ void* UdpServer::actualStartListening(void* ctx)
             else continue;
         }
 
+        if (sender.sin_addr.s_addr = Server::getLocalhostIp() && server->disableSelfBroadcasts)
+        {
+            continue;
+        }
+
         HandleBroadcastArgs* args = new HandleBroadcastArgs(server, buf, rcvlen, sender.sin_addr.s_addr);
 		if(!server->addDispatcherThread(&UdpServer::handleBroadcastReceive, (void*)args , NULL))
         {
@@ -116,6 +121,11 @@ void* UdpServer::handleBroadcastReceive(void* handleArgs)
 	delete args;
 	server->finishThread();
 	return NULL;
+}
+
+void UdpServer::enableSelfBroadcasts()
+{
+    disableSelfBroadcasts = false;
 }
 
 UdpServer::~UdpServer()

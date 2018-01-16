@@ -147,9 +147,32 @@ BOOST_AUTO_TEST_CASE(checkTcpServerWorksAtAll)
     delete server;
 }
 
-BOOST_AUTO_TEST_CASE(checkUdpServerWorksAtAll)
+BOOST_AUTO_TEST_CASE(checkUdpDoesntReceiveSelfBroadcasts)
 {
     UdpServer* server = new UdpServer(&MyConfig::udpResolveCallback);
+    server->startListening();
+    MyConfig::udpResolveCallbackCount = 0;
+
+    uint32_t sentDataSize = 400;
+    uint8_t* data = new uint8_t[sentDataSize];
+    for (int i = 0; i < sentDataSize; ++i)
+    {
+        data[i] = rand() % 256;
+    }
+    server->broadcast(data, sentDataSize);
+
+    usleep(50000);
+
+    server->stopListening();
+    BOOST_TEST(MyConfig::udpResolveCallbackCount == 0);
+}
+
+BOOST_AUTO_TEST_CASE(checkUdpServerWorksAtAll)
+{
+    MyConfig::udpResolveCallbackCount = 0;
+    Server::getLocalhostIp();
+    UdpServer* server = new UdpServer(&MyConfig::udpResolveCallback);
+    server->enableSelfBroadcasts();
     server->startListening();
 
     uint32_t sentDataSize = 400;
@@ -181,6 +204,7 @@ BOOST_AUTO_TEST_CASE(checkServersWaitForDispatchersToFinish)
     MyConfig::tcpResolveCallbackCount = 0;
     TcpServer tcp(&MyConfig::tcpLongCallback, &MyConfig::errorCallback);
     UdpServer udp(&MyConfig::udpLongCallback);
+    udp.enableSelfBroadcasts();
     tcp.startListening();
     udp.startListening();
 
@@ -221,6 +245,7 @@ BOOST_AUTO_TEST_CASE(checkMultipleRecipientsGetExpectedResponses)
     srand(time(NULL));
     TcpServer tcp(&MyConfig::tcpMapResponse, &MyConfig::errorCallback);
     UdpServer udp(&MyConfig::udpMapResponse);
+    udp.enableSelfBroadcasts();
     tcp.startListening();
     udp.startListening();
 

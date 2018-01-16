@@ -39,6 +39,7 @@ public:
 	virtual void startListening() = 0;
 	void stopListening();
 	virtual ~Server();
+	static in_addr_t getLocalhostIp();
 };
 
 
