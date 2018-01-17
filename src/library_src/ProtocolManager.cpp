@@ -485,6 +485,15 @@ bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
             return false;
         }
         descriptor = *descriptorPointer;
+
+        // check unauthorized access
+        if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
+            BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
+                                    << " md5: " << hash.getHash()
+                                    << " you are not the owner! Owner ip: "
+                                    << getFormatedIp(descriptor.getOwnerIp());
+            return false;
+        }
     }
 
     // discard descriptor
