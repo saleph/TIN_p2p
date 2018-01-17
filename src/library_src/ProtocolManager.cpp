@@ -1,5 +1,7 @@
 #include <p2pMessage.hpp>
 #include <iostream>
+#include <FileStorer.hpp>
+#include <thread>
 #include "FileLoader.hpp"
 #include "mutex.hpp"
 #include "guard.hpp"
@@ -16,7 +18,14 @@ namespace p2p {
 
         std::vector<FileDescriptor> localDescriptors;
         std::vector<FileDescriptor> networkDescriptors;
+        std::vector<in_addr_t> nodesAddresses;
         Mutex mutex;
+
+        // starting state estimators
+        const unsigned NEW_NODE_STATE_DURATION_MS = 5000u;
+        std::thread timer;
+        Mutex mutexIsStillNewNode;
+        bool isStillNewNode = true;
 
         void processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
 
@@ -45,25 +54,40 @@ namespace p2p {
 
         void uploadFile(FileDescriptor &descriptor);
 
+        in_addr_t findOtherLeastLoadedNode();
+
+        void removeDuplicatesFromLists();
     }
 }
 
 void p2p::endSession() {
+    Guard guard(util::mutex);
+    util::quitFromNetwork();
     util::tcpServer->stopListening();
     util::udpServer->stopListening();
     util::tcpServer.reset();
     util::tcpServer.reset();
-    util::quitFromNetwork();
+    // prevent corruption
+    util::timer.join();
 }
 
 void p2p::startSession() {
-    util::initProcessingFunctions();
-    util::tcpServer = std::make_shared<TcpServer>(&util::processTcpMsg, &util::processTcpError);
-    util::udpServer = std::make_shared<UdpServer>(&util::processUdpMsg);
-    util::udpServer->enableSelfBroadcasts();
-    util::tcpServer->startListening();
-    util::udpServer->startListening();
-    util::joinToNetwork();
+    // fire "new node state" timer
+    // as long as the node is marked as "new" it collects all the HELLO_REPLY,
+    // what is not what we want for older nodes
+    using namespace util;
+    timer = std::thread([&isStillNewNode, &mutexIsStillNewNode, NEW_NODE_STATE_DURATION_MS]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(NEW_NODE_STATE_DURATION_MS));
+        Guard guard(util::mutexIsStillNewNode);
+        isStillNewNode = false;
+    });
+    initProcessingFunctions();
+    tcpServer = std::make_shared<TcpServer>(&processTcpMsg, &processTcpError);
+    udpServer = std::make_shared<UdpServer>(&processUdpMsg);
+    udpServer->enableSelfBroadcasts();
+    tcpServer->startListening();
+    udpServer->startListening();
+    joinToNetwork();
 }
 
 void p2p::util::processTcpError(SocketOperation operation) {
@@ -107,22 +131,25 @@ void p2p::util::quitFromNetwork() {
     uint32_t messageSize = sizeof(P2PMessage);
 
     udpServer->broadcast((uint8_t *) &message, messageSize);
-    // wait 10ms
-    usleep(10000);
     BOOST_LOG_TRIVIAL(debug) << ">>> DISCONNECTIONG: quiting from network";
     moveLocalDescriptorsIntoOtherNodes();
 }
 
 void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
-    Guard guard(mutex);
+    // we already have mutex taken in p2p::util::endSession()
 
     for (auto &&localDescriptor : localDescriptors) {
         discardDescriptor(localDescriptor);
     }
-    BOOST_LOG_TRIVIAL(debug) << "### Local " << localDescriptors.size() << " descriptors discarded";
 
     for (auto &&localDescriptor : localDescriptors) {
-        in_addr_t nodeToSend = findLeastLoadedNode();
+        in_addr_t nodeToSend;
+        try {
+            nodeToSend = findOtherLeastLoadedNode();
+        } catch (std::logic_error &e) {
+            BOOST_LOG_TRIVIAL(debug) << "===> endSession: no other node exists, current files will be lost";
+            // no need to revoke file: noone is listening
+        }
         changeHolderNode(localDescriptor, nodeToSend);
     }
     localDescriptors.clear();
@@ -161,6 +188,36 @@ in_addr_t p2p::util::findLeastLoadedNode() {
                                           const std::pair<in_addr_t, int> &p2) {
                                            return p1.second < p2.second;
                                        });
+    return mapElement->first;
+}
+
+in_addr_t p2p::util::findOtherLeastLoadedNode() {
+    if (networkDescriptors.empty()) {
+        throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
+    }
+
+    in_addr_t thisNodeAddress = tcpServer->getLocalhostIp();
+
+    // map for easier collection of data
+    std::unordered_map<in_addr_t, unsigned long> nodesLoad;
+
+    // count uses
+    for (auto &&descriptor : networkDescriptors) {
+        nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
+    }
+
+    // find min element
+    auto mapElement = std::min_element(nodesLoad.begin(), nodesLoad.end(),
+                                       [thisNodeAddress](const std::pair<in_addr_t, int> &p1,
+                                                         const std::pair<in_addr_t, int> &p2) {
+                                           // process nodes that differs from the basic
+                                           return p1.second < p2.second && p1.first != thisNodeAddress;
+                                       });
+
+    // if any other node is not found
+    if (mapElement == nodesLoad.end()) {
+        throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
+    }
     return mapElement->first;
 }
 
@@ -273,12 +330,20 @@ void p2p::deleteFile(const std::string &name) {
 
 
 void p2p::util::initProcessingFunctions() {
+    // first message sent by new node; in reply we pass our local descriptors
     messageProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        if (sourceAddress == udpServer->getLocalhostIp()) {
+            // its our hello
+            return;
+        }
         BOOST_LOG_TRIVIAL(debug) << "<<< HELLO from: " << ntohl(sourceAddress);
         Guard guard(mutex);
+        // save node address for later
+        nodesAddresses.push_back(sourceAddress);
+
+        // construct p2pmessage
         P2PMessage message = {};
         message.setMessageType(MessageType::HELLO_REPLY);
-
         unsigned long additionalDataSize = localDescriptors.size() * sizeof(FileDescriptor);
         message.setAdditionalDataSize(additionalDataSize);
 
@@ -297,7 +362,20 @@ void p2p::util::initProcessingFunctions() {
         util::tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
     };
 
+    // replay for other nodes
     messageProcessors[MessageType::HELLO_REPLY] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        { // check if this node is already older node
+            Guard guard(mutexIsStillNewNode);
+            if (!isStillNewNode) {
+                // we are adult node and we have all descriptors
+                BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY: hello reply received as adult node - do nothing";
+                return;
+            } else {
+                // remove duplicates if present
+                removeDuplicatesFromLists();
+            }
+        }
+
         if (sourceAddress == udpServer->getLocalhostIp()) {
             // our broadcast, skip
             return;
@@ -308,13 +386,23 @@ void p2p::util::initProcessingFunctions() {
         std::vector<FileDescriptor> buffer(size / sizeof(FileDescriptor));
 
         // put descriptors
-        memcpy(buffer.data(), data, size);
+        memcpy((uint8_t *) buffer.data(), data, size);
 
         Guard guard(mutex);
+        // preserve source address
+        nodesAddresses.push_back(sourceAddress);
         networkDescriptors.insert(networkDescriptors.end(), buffer.begin(), buffer.end());
     };
 
+    // message sent by node, which starts shutdown; discards every his descriptor
+    // discarding is not neccessary (quiting node should do it even before this message)
+    // but it ensures, that no one will interrupt the collapsing node
     messageProcessors[MessageType::DISCONNECTING] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        if (sourceAddress == udpServer->getLocalhostIp()) {
+            // our broadcast, skip
+            return;
+        }
+
         Guard guard(mutex);
         // mark descriptors of disconnecting node as discarded
         for (auto &&descriptor : networkDescriptors) {
@@ -325,22 +413,30 @@ void p2p::util::initProcessingFunctions() {
         BOOST_LOG_TRIVIAL(debug) << "<<< DISCONNECTING: node " << sourceAddress << " start disconnecting";
     };
 
+    // if someone signals that some node quit "definitely not gently"
     messageProcessors[MessageType::CONNECTION_LOST] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
         if (size != sizeof(in_addr_t)) {
             throw std::runtime_error("CONNECTION_LOST: additional data does not contain IP address of the lost node");
         }
         // only additional information is lostNode IP
         in_addr_t lostNodeAddress = *(in_addr_t *) data;
-        BOOST_LOG_TRIVIAL(debug) << "<<< CONNECTION_LOST: node " << lostNodeAddress;
 
+        int lostDescriptorsNumber = 0;
         Guard guard(mutex);
         std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                       [lostNodeAddress](const FileDescriptor &fileDescriptor) {
+                       [lostNodeAddress, &lostDescriptorsNumber](const FileDescriptor &fileDescriptor) {
+                           ++lostDescriptorsNumber;
                            return fileDescriptor.getHolderIp() == lostNodeAddress;
                        });
+        BOOST_LOG_TRIVIAL(debug) << "<<< CONNECTION_LOST: with node " << lostNodeAddress
+                                 << "; lost " << lostDescriptorsNumber << " descriptors";
     };
 
     messageProcessors[MessageType::CMD_REFUSED] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+
+    };
+
+    messageProcessors[MessageType::SHUTDOWN] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
 
     };
 
@@ -351,7 +447,8 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor newFileDescriptor = *(FileDescriptor *) data;
 
         BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
-                                 << " md5: " << newFileDescriptor.getMd5().getHash();
+                                 << " md5: " << newFileDescriptor.getMd5().getHash()
+                                 << " in node: " << ntohl(sourceAddress);
 
         Guard guard(mutex);
         networkDescriptors.push_back(newFileDescriptor);
@@ -364,7 +461,7 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor revokedFileDescriptor = *(FileDescriptor *) data;
 
         BOOST_LOG_TRIVIAL(debug) << "<<< REVOKE_FILE: " << revokedFileDescriptor.getName() << " "
-                                 << " MD5: " << revokedFileDescriptor.getMd5().getHash();
+                                 << " md5: " << revokedFileDescriptor.getMd5().getHash();
 
         Md5Hash revokedFileHash = revokedFileDescriptor.getMd5();
 
@@ -381,28 +478,42 @@ void p2p::util::initProcessingFunctions() {
 
     messageProcessors[MessageType::UPDATE_DESCRIPTOR] = [](const uint8_t *data, uint32_t size,
                                                            in_addr_t sourceAddress) {
-        FileDescriptor updatedFileDescriptor(nullptr);
-        memcpy(&updatedFileDescriptor, data, sizeof(FileDescriptor));
 
-        for (auto &&networkDescriptor : networkDescriptors) {
-            if (networkDescriptor.getMd5() == updatedFileDescriptor.getMd5()) {
-                networkDescriptor = updatedFileDescriptor;
-                break;
-            }
-        }
     };
 
     messageProcessors[MessageType::HOLDER_CHANGE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
 
     };
 
+    // reply for our request for file
     messageProcessors[MessageType::FILE_TRANSFER] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor fileDescriptor(nullptr);
-        memcpy(&fileDescriptor, data, sizeof(FileDescriptor));
+        FileDescriptor descriptor = *(FileDescriptor *) data;
 
+        // at the beginning was the descriptor present
+        std::vector<uint8_t> buffer(size - sizeof(FileDescriptor));
 
+        // copy the file content to our buffer
+        memcpy(buffer.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
+
+        // store received file into FS
+        FileStorer fileStorer(descriptor.getName());
+        fileStorer.storeFile(buffer);
+        auto storedFileHash = fileStorer.getHash();
+
+        // check hash
+        if (storedFileHash != descriptor.getMd5()) {
+            BOOST_LOG_TRIVIAL(debug) << "<<< FILE_TRANSFER: md5 differs!!! is: "
+                                     << storedFileHash.getHash()
+                                     << " should be: " << descriptor.getMd5().getHash();
+            return;
+        }
+
+        BOOST_LOG_TRIVIAL(debug) << "<<< FILE_TRANSFER: received " << descriptor.getName()
+                                 << " md5: " << descriptor.getMd5().getHash()
+                                 << " from " << ntohl(sourceAddress);
     };
 
+    // request for upload a file: other node send us a file via TCP and we have to publish it in the network
     messageProcessors[MessageType::UPLOAD_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
         FileDescriptor newFileDescriptor(nullptr);
         memcpy(&newFileDescriptor, data, sizeof(FileDescriptor));
@@ -423,21 +534,27 @@ void p2p::util::initProcessingFunctions() {
         udpServer->broadcast(buffer.data(), buffer.size());
     };
 
+    // other node want to access a file stored in our node
     messageProcessors[MessageType::GET_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor fileDescriptor(nullptr);
-        memcpy(&fileDescriptor, data, sizeof(FileDescriptor));
+        FileDescriptor descriptor = *(FileDescriptor *) data;
+        BOOST_LOG_TRIVIAL(debug) << "<<< GET_FILE: request for " << descriptor.getName()
+                                 << " md5: " << descriptor.getMd5().getHash()
+                                 << " from " << ntohl(sourceAddress);
 
-        P2PMessage message = {};
+        P2PMessage message{};
+        // set message type as file transfer
         message.setMessageType(MessageType::FILE_TRANSFER);
-        message.setAdditionalDataSize(sizeof(FileDescriptor) + fileDescriptor.getSize());
+        // get file content
+        auto fileContent = getFileContent(descriptor);
+        // set msg additional size to size of the descriptor and file content length
+        message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
+        // prepare buffer
+        std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
 
-        std::vector<uint8_t> buffer(sizeof(FileDescriptor) + sizeof(P2PMessage) + fileDescriptor.getSize());
+        // prepare message
         memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), &fileDescriptor, sizeof(FileDescriptor));
-        /*
-        FILE *stream = fopen(fileDescriptor.getName(), "rb");
-        fread(void *ptr, size_t size, size_t nitems, FILE *stream);
-        */
+        memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
+        memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
 
         tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
     };
@@ -469,4 +586,22 @@ void p2p::util::initProcessingFunctions() {
         udpServer->broadcast(buffer.data(), buffer.size());
     };
 
+}
+
+
+void p2p::util::removeDuplicatesFromLists() {
+    Guard guard(mutex);
+    auto descriptorSorter = [](const FileDescriptor &fd1, const FileDescriptor &fd2) {
+        return fd1.getMd5().getHash() > fd2.getMd5().getHash();
+    };
+    auto descriptorComparator = [](const FileDescriptor &fd1, const FileDescriptor &fd2) {
+        return fd1.getMd5() == fd2.getMd5();
+    };
+    // remove duplicates from descriptors
+    std::sort(networkDescriptors.begin(), networkDescriptors.end(), descriptorSorter);
+    networkDescriptors.erase(std::unique(networkDescriptors.begin(), networkDescriptors.end(), descriptorComparator), networkDescriptors.end());
+
+    // remove duplicates from adresses
+    std::sort(nodesAddresses.begin(), nodesAddresses.end());
+    nodesAddresses.erase(std::unique(nodesAddresses.begin(), nodesAddresses.end()), nodesAddresses.end());
 }

@@ -34,6 +34,10 @@ public:
 	bool operator==(const Md5Hash &other) const {
 		return !strcmp(hash, other.hash);
 	}
+
+    bool operator!=(const Md5Hash &other) const {
+        return !operator==(other);
+    }
 };
 
 #endif /* INCLUDE_MD5HASH_HPP_ */

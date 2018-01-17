@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include "md5hash.hpp"
+#include "md5sum.hpp"
 
 class FileStorer {
 public:
@@ -17,6 +19,10 @@ public:
         std::ofstream file(filename, std::ios_base::out);
         file << (char*)content.data();
         file.close();
+    }
+
+    Md5Hash getHash() const {
+        return Md5sum(filename).getMd5Hash();
     }
 
 private:
