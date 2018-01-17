@@ -58,6 +58,8 @@ namespace p2p {
         in_addr_t findOtherLeastLoadedNode();
 
         void removeDuplicatesFromLists();
+
+        void sendCommandRefused(MessageType messageType, in_addr_t sourceAddress);
     }
 }
 
@@ -528,21 +530,46 @@ void p2p::util::initProcessingFunctions() {
 
     // request for upload a file: other node send us a file via TCP and we have to publish it in the network
     messageProcessors[MessageType::UPLOAD_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor newFileDescriptor(nullptr);
-        memcpy(&newFileDescriptor, data, sizeof(FileDescriptor));
+        FileDescriptor descriptor = *(FileDescriptor*)data;
 
-        localDescriptors.push_back(newFileDescriptor);
+        // prepare buffer
+        std::vector<uint8_t> buffer(size - sizeof(FileDescriptor));
+        // copy file content
+        memcpy(buffer.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
+        // store file as its hash
+        auto newFileName = descriptor.getMd5().getHash();
+        storeFileContent(buffer, newFileName);
+        // check hash
+        auto newFileHash = Md5sum(newFileName).getMd5Hash();
 
-        //TODO - obsluga pliku
+        if (newFileHash != descriptor.getMd5()) {
+            BOOST_LOG_TRIVIAL(debug) << "<<< UPLOAD_FILE: hashes differ!!! is: " << newFileHash.getHash()
+                                     << " should be: " << descriptor.getMd5().getHash()
+                                     << "; file not published into networ";
+            sendCommandRefused(MessageType::UPLOAD_FILE, sourceAddress);
+            // does nothing more, network does not now about the file
+            return;
+        }
 
-        P2PMessage message = {};
+        // we have valid file here
+        BOOST_LOG_TRIVIAL(debug) << ">>> NEW_FILE: publishing descriptor into the network of the "
+                                 << "properly received file " << descriptor.getName()
+                                 << " md5: " << descriptor.getMd5().getHash();
+        {
+            // append to our local descriptors
+            Guard guard(mutex);
+            localDescriptors.push_back(descriptor);
+        }
+
+        // notify the network about new file
+        P2PMessage message{};
         message.setMessageType(MessageType::NEW_FILE);
         message.setAdditionalDataSize(sizeof(FileDescriptor));
 
-        std::vector<uint8_t> buffer(sizeof(FileDescriptor) + sizeof(P2PMessage));
+        buffer.resize(sizeof(P2PMessage) + message.getAdditionalDataSize());
 
         memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), &newFileDescriptor, sizeof(FileDescriptor));
+        memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t*)&descriptor, sizeof(FileDescriptor));
 
         udpServer->broadcast(buffer.data(), buffer.size());
     };
@@ -573,30 +600,7 @@ void p2p::util::initProcessingFunctions() {
     };
 
     messageProcessors[MessageType::DELETE_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor deletedFileDescriptor(nullptr);
-        memcpy(&deletedFileDescriptor, data, sizeof(FileDescriptor));
-
-        for (std::vector<FileDescriptor>::const_iterator i = localDescriptors.begin();
-             i != localDescriptors.end(); ++i) {
-            if (i->getName() == deletedFileDescriptor.getName()) {
-                localDescriptors.erase(i);
-                break;
-            }
-        }
-
-        //TODO - obsluga pliku
-
-
-        P2PMessage message = {};
-        message.setMessageType(MessageType::REVOKE_FILE);
-        message.setAdditionalDataSize(sizeof(FileDescriptor));
-
-        std::vector<uint8_t> buffer(sizeof(FileDescriptor) + sizeof(P2PMessage));
-
-        memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), &deletedFileDescriptor, sizeof(FileDescriptor));
-
-        udpServer->broadcast(buffer.data(), buffer.size());
+        //TODO: delete file
     };
 
 }
@@ -617,4 +621,8 @@ void p2p::util::removeDuplicatesFromLists() {
     // remove duplicates from adresses
     std::sort(nodesAddresses.begin(), nodesAddresses.end());
     nodesAddresses.erase(std::unique(nodesAddresses.begin(), nodesAddresses.end()), nodesAddresses.end());
+}
+
+void p2p::util::sendCommandRefused(MessageType messageType, in_addr_t sourceAddress) {
+
 }
