@@ -39,6 +39,8 @@ public:
 	std::string getFormattedUploadTime() const;
 	void setUploadTime(time_t uploadTime);
 
+    FileDescriptor &operator=(const FileDescriptor &other);
+
 private:
 	static uint32_t obtainFileSize(const char* fn);
 	void setName(const std::string& name);

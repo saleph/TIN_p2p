@@ -31,6 +31,11 @@ public:
 		return std::string(hash);
 	}
 
+	Md5Hash &operator=(const Md5Hash &other) {
+		strcpy(hash, other.hash);
+		return *this;
+	}
+
 	bool operator==(const Md5Hash &other) const {
 		return !strcmp(hash, other.hash);
 	}

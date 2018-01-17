@@ -74,3 +74,15 @@ void FileDescriptor::makeUnvalid() {
 bool FileDescriptor::isValid() const {
 	return valid;
 }
+
+FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
+	strcpy(name, other.name);
+    md5 = other.md5;
+    size = other.size;
+    uploadTime = other.uploadTime;
+    ownerIp = other.ownerIp;
+    holderIp = other.holderIp;
+    valid = other.valid;
+
+    return *this;
+}
