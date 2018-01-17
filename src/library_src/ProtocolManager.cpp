@@ -149,6 +149,7 @@ void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
         } catch (std::logic_error &e) {
             BOOST_LOG_TRIVIAL(debug) << "===> endSession: no other node exists, current files will be lost";
             // no need to revoke file: noone is listening
+            break;
         }
         changeHolderNode(localDescriptor, nodeToSend);
     }
@@ -192,7 +193,7 @@ in_addr_t p2p::util::findLeastLoadedNode() {
 }
 
 in_addr_t p2p::util::findOtherLeastLoadedNode() {
-    if (networkDescriptors.empty()) {
+    if (networkDescriptors.empty() || nodesAddresses.empty()) {
         throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
     }
 
@@ -243,7 +244,7 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
     memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
 
     tcpServer->sendData(buffer.data(), buffer.size(), newNodeAddress);
-    BOOST_LOG_TRIVIAL(debug) << ">>> HOLDER_CHANGE: " << descriptor.getName() << " to " << newNodeAddress;
+    BOOST_LOG_TRIVIAL(debug) << ">>> HOLDER_CHANGE: " << descriptor.getName() << " to " << ntohl(newNodeAddress);
 }
 
 std::vector<uint8_t> p2p::util::getFileContent(FileDescriptor &descriptor) {
