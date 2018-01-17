@@ -16,8 +16,8 @@ namespace p2p {
     void startSession();
     void endSession();
     void uploadFile(const std::string &name);
-    void getFile(const std::string &name);
-    void deleteFile(const std::string &name);
+    bool getFile(const std::string &name, const Md5Hash &hash);
+    bool deleteFile(const std::string &name, const Md5Hash &hash);
 };
 
 
