@@ -162,7 +162,8 @@ void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
         } catch (std::logic_error &e) {
             BOOST_LOG_TRIVIAL(debug) << "===> endSession: no other node exists, current files will be lost";
             // no need to revoke file: noone is listening
-            break;
+            localDescriptors.clear();
+            return;
         }
         changeHolderNode(localDescriptor, nodeToSend);
     }
