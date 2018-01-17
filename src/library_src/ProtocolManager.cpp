@@ -61,6 +61,10 @@ namespace p2p {
 
         void sendCommandRefused(MessageType messageType, in_addr_t sourceAddress);
 
+        void sendShutdown();
+
+        void publishLostNode(in_addr_t nodeAddress);
+
     }
     const char* getFormatedIp(in_addr_t addr) {
         return inet_ntoa(*(in_addr*)&addr);
@@ -101,11 +105,28 @@ void p2p::startSession() {
 
 void p2p::util::processTcpError(SocketOperation operation) {
     // we lost the node
-    if (operation.status == SocketOperation::Type::TcpSend) {
+    if (operation.status == SocketOperation::Status::SendFailed) {
         in_addr_t lostNode = operation.connectionAddr;
-
+        BOOST_LOG_TRIVIAL(info) << ">>> CONNECTION_LOST: detected connection lost with " << getFormatedIp(lostNode);
+        // publish this information
+        publishLostNode(lostNode);
+        return;
     }
     BOOST_LOG_TRIVIAL(debug) << "Internal TCP error - check your net connection";
+}
+
+
+void p2p::util::publishLostNode(in_addr_t nodeAddress) {
+    P2PMessage message{};
+    message.setMessageType(MessageType::CONNECTION_LOST);
+    message.setAdditionalDataSize(sizeof(in_addr_t));
+
+    // prepare buffer
+    std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
+    memcpy(buffer.data(), (uint8_t*)&message, sizeof(P2PMessage));
+    memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t*)&nodeAddress, sizeof(in_addr_t));
+    // publish this information
+    udpServer->broadcast(buffer.data(), buffer.size());
 }
 
 void p2p::util::processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation) {
@@ -147,6 +168,16 @@ void p2p::util::quitFromNetwork() {
     udpServer->broadcast((uint8_t *) &message, messageSize);
     BOOST_LOG_TRIVIAL(debug) << ">>> DISCONNECTING: start node closing procedure";
     moveLocalDescriptorsIntoOtherNodes();
+    sendShutdown();
+}
+
+
+void p2p::util::sendShutdown() {
+    P2PMessage message{};
+    message.setMessageType(MessageType::SHUTDOWN);
+    message.setAdditionalDataSize(0);
+
+    udpServer->broadcast((uint8_t*)&message, sizeof(P2PMessage));
 }
 
 void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
