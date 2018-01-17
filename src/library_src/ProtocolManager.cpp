@@ -516,6 +516,11 @@ void p2p::util::initProcessingFunctions() {
 
     // last message sent by collapsing node - nothing will be valid, so ensure that everything is deleted
     msgProcessors[MessageType::SHUTDOWN] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        if (sourceAddress == udpServer->getLocalhostIp()) {
+            // its our broadcast, skip
+            return;
+        }
+
         Guard guard(mutex);
         // remove all associated data
         nodesAddresses.erase(std::remove(nodesAddresses.begin(), nodesAddresses.end(), sourceAddress));
