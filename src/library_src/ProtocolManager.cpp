@@ -60,6 +60,10 @@ namespace p2p {
         void removeDuplicatesFromLists();
 
         void sendCommandRefused(MessageType messageType, in_addr_t sourceAddress);
+
+    }
+    const char* getFormatedIp(in_addr_t addr) {
+        return inet_ntoa(*(in_addr*)&addr);
     }
 }
 
@@ -153,7 +157,7 @@ void p2p::util::moveLocalDescriptorsIntoOtherNodes() {
     }
 
     // wait for our discards
-    usleep(1000);
+    usleep(100000);
 
     for (auto &&localDescriptor : localDescriptors) {
         in_addr_t nodeToSend;
@@ -265,7 +269,7 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
     memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
 
     tcpServer->sendData(buffer.data(), buffer.size(), newNodeAddress);
-    BOOST_LOG_TRIVIAL(debug) << ">>> HOLDER_CHANGE: " << descriptor.getName() << " to " << ntohl(newNodeAddress);
+    BOOST_LOG_TRIVIAL(debug) << ">>> HOLDER_CHANGE: " << descriptor.getName() << " to " << getFormatedIp(newNodeAddress);
 }
 
 std::vector<uint8_t> p2p::util::getFileContent(const std::string &name) {
@@ -314,7 +318,7 @@ void p2p::uploadFile(const std::string &name) {
 
     util::uploadFile(newDescriptor);
     BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName()
-                             << " saved in node " << leastLoadNodeAddress;
+                             << " saved in node " << getFormatedIp(leastLoadNodeAddress);
 }
 
 void p2p::util::publishDescriptor(FileDescriptor &descriptor) {
@@ -368,7 +372,7 @@ void p2p::util::initProcessingFunctions() {
             // its our hello
             return;
         }
-        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO from: " << ntohl(sourceAddress);
+        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO from: " << getFormatedIp(sourceAddress);
         Guard guard(mutex);
         // save node address for later
         nodesAddresses.push_back(sourceAddress);
@@ -412,7 +416,7 @@ void p2p::util::initProcessingFunctions() {
             // our broadcast, skip
             return;
         }
-        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY from: " << ntohl(sourceAddress) << " "
+        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY from: " << getFormatedIp(sourceAddress) << " "
                                  << size / sizeof(FileDescriptor) << " descriptors received";
 
         std::vector<FileDescriptor> buffer(size / sizeof(FileDescriptor));
@@ -475,7 +479,7 @@ void p2p::util::initProcessingFunctions() {
         // get description of the problem
         char *errorDescription = (char *) (data + sizeof(P2PMessage));
 
-        BOOST_LOG_TRIVIAL(info) << "<<< CMD_REFUSED: node " << ntohl(sourceAddress)
+        BOOST_LOG_TRIVIAL(info) << "<<< CMD_REFUSED: node " << getFormatedIp(sourceAddress)
                                 << " refused command, message: " << errorDescription;
     };
 
@@ -488,7 +492,7 @@ void p2p::util::initProcessingFunctions() {
                                                 [sourceAddress](const FileDescriptor &fileDescriptor) {
                                                     return fileDescriptor.getHolderIp() == sourceAddress;
                                                 }));
-        BOOST_LOG_TRIVIAL(debug) << "<<< SHUTDOWN: node " << ntohl(sourceAddress) << " have been closed";
+        BOOST_LOG_TRIVIAL(debug) << "<<< SHUTDOWN: node " << getFormatedIp(sourceAddress) << " have been closed";
     };
 
     // new file descriptor received - put it into network descriptors list
@@ -500,7 +504,7 @@ void p2p::util::initProcessingFunctions() {
 
         BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
                                  << " md5: " << newFileDescriptor.getMd5().getHash()
-                                 << " in node: " << ntohl(sourceAddress);
+                                 << " in node: " << getFormatedIp(sourceAddress);
 
         Guard guard(mutex);
         networkDescriptors.push_back(newFileDescriptor);
@@ -529,7 +533,7 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor descriptor = *(FileDescriptor *) data;
         BOOST_LOG_TRIVIAL(debug) << "<<< DISCARD_DESCRIPTOR: " << descriptor.getName()
                                  << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << ntohl(sourceAddress);
+                                 << " from " << getFormatedIp(sourceAddress);
 
         Guard guard(mutex);
         // make this descriptor no longer valid
@@ -546,7 +550,7 @@ void p2p::util::initProcessingFunctions() {
 
         BOOST_LOG_TRIVIAL(debug) << "<<< UPDATE_DESCRIPTOR: " << updatedDescriptor.getName()
                                  << " md5: " << updatedDescriptor.getMd5().getHash()
-                                 << " from " << ntohl(sourceAddress);
+                                 << " from " << getFormatedIp(sourceAddress);
 
         Guard guard(mutex);
         // update particular descriptor
@@ -562,7 +566,7 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor updatedDescriptor = *(FileDescriptor*)data;
         BOOST_LOG_TRIVIAL(debug) << "<<< HOLDER_CHANGE: store here " << updatedDescriptor.getName()
                                  << " md5: " << updatedDescriptor.getMd5().getHash()
-                                 << " from " << ntohl(sourceAddress);
+                                 << " from " << getFormatedIp(sourceAddress);
         // this descriptor will be valid now
         updatedDescriptor.makeValid();
 
@@ -618,7 +622,7 @@ void p2p::util::initProcessingFunctions() {
 
         BOOST_LOG_TRIVIAL(debug) << "<<< FILE_TRANSFER: received " << descriptor.getName()
                                  << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << ntohl(sourceAddress);
+                                 << " from " << getFormatedIp(sourceAddress);
     };
 
     // request for upload a file: other node send us a file via TCP and we have to publish it in the network
@@ -672,7 +676,7 @@ void p2p::util::initProcessingFunctions() {
         FileDescriptor descriptor = *(FileDescriptor *) data;
         BOOST_LOG_TRIVIAL(debug) << "<<< GET_FILE: request for " << descriptor.getName()
                                  << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << ntohl(sourceAddress);
+                                 << " from " << getFormatedIp(sourceAddress);
 
         P2PMessage message{};
         // set message type as file transfer
