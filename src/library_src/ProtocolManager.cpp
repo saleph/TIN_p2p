@@ -47,8 +47,9 @@ namespace p2p {
 
         void changeHolderNode(FileDescriptor &descriptor, in_addr_t send);
 
-        std::vector<uint8_t> getFileContent(FileDescriptor &descriptor);
+        std::vector<uint8_t> getFileContent(const std::string &name);
 
+        void storeFileContent(std::vector<uint8_t> &content, const std::string &name);
 
         void publishDescriptor(FileDescriptor &descriptor);
 
@@ -230,7 +231,7 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
     descriptor.setHolderIp(newNodeAddress);
 
     // get file as array
-    auto fileContent = getFileContent(descriptor);
+    auto fileContent = getFileContent(descriptor.getMd5().getHash());
 
     message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
 
@@ -247,9 +248,14 @@ void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAd
     BOOST_LOG_TRIVIAL(debug) << ">>> HOLDER_CHANGE: " << descriptor.getName() << " to " << ntohl(newNodeAddress);
 }
 
-std::vector<uint8_t> p2p::util::getFileContent(FileDescriptor &descriptor) {
-    FileLoader loader(descriptor.getName());
+std::vector<uint8_t> p2p::util::getFileContent(const std::string &name) {
+    FileLoader loader(name);
     return loader.getContent();
+}
+
+void p2p::util::storeFileContent(std::vector<uint8_t> &content, const std::string &name) {
+    FileStorer storer(name);
+    storer.storeFile(content);
 }
 
 void p2p::uploadFile(const std::string &name) {
@@ -273,6 +279,9 @@ void p2p::uploadFile(const std::string &name) {
     newDescriptor.makeValid();
 
     if (leastLoadNodeAddress == thisHostAddress) {
+        auto fileContent = util::getFileContent(newDescriptor.getName());
+
+
         // we are the least load node - only publish the descriptor
         util::publishDescriptor(newDescriptor);
         BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on this host";
@@ -305,7 +314,8 @@ void p2p::util::publishDescriptor(FileDescriptor &descriptor) {
 void p2p::util::uploadFile(FileDescriptor &descriptor) {
     P2PMessage message{};
     message.setMessageType(MessageType::UPLOAD_FILE);
-    auto fileContent = getFileContent(descriptor);
+    // load file specified by user
+    auto fileContent = getFileContent(descriptor.getName());
 
     // set additional data size to size of descritor + content
     message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
@@ -473,17 +483,20 @@ void p2p::util::initProcessingFunctions() {
                                                 }));
     };
 
-    messageProcessors[MessageType::DISCARD_DESCRIPTOR] = [](const uint8_t *data, uint32_t size,
-                                                            in_addr_t sourceAddress) {
+    messageProcessors[MessageType::DISCARD_DESCRIPTOR] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        //TODO: discard
+        BOOST_LOG_TRIVIAL(debug) << "<<< DISCARD_DESCRIPTOR: from " << ntohl(sourceAddress);
     };
 
-    messageProcessors[MessageType::UPDATE_DESCRIPTOR] = [](const uint8_t *data, uint32_t size,
-                                                           in_addr_t sourceAddress) {
-
+    messageProcessors[MessageType::UPDATE_DESCRIPTOR] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+        //TODO: updateDescriptor
+        BOOST_LOG_TRIVIAL(debug) << "<<< UPDATE_DESCRIPTOR: from " << ntohl(sourceAddress);
     };
 
     messageProcessors[MessageType::HOLDER_CHANGE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
 
+        // TODO: file received by holder_change should be saved by its md5 hash
+        BOOST_LOG_TRIVIAL(debug) << "<<< HOLDER_CHANGE: from " << ntohl(sourceAddress);
     };
 
     // reply for our request for file
@@ -497,9 +510,8 @@ void p2p::util::initProcessingFunctions() {
         memcpy(buffer.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
 
         // store received file into FS
-        FileStorer fileStorer(descriptor.getName());
-        fileStorer.storeFile(buffer);
-        auto storedFileHash = fileStorer.getHash();
+        storeFileContent(buffer, descriptor.getName());
+        auto storedFileHash = Md5sum(descriptor.getName()).getMd5Hash();
 
         // check hash
         if (storedFileHash != descriptor.getMd5()) {
@@ -546,7 +558,7 @@ void p2p::util::initProcessingFunctions() {
         // set message type as file transfer
         message.setMessageType(MessageType::FILE_TRANSFER);
         // get file content
-        auto fileContent = getFileContent(descriptor);
+        auto fileContent = getFileContent(descriptor.getMd5().getHash());
         // set msg additional size to size of the descriptor and file content length
         message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
         // prepare buffer
