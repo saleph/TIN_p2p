@@ -18,6 +18,7 @@ int main() {
         switch (i) {
             case 0:
                 spin = false;
+                break;
             case 1:
                 p2p::uploadFile("example" + std::to_string(counter1++) + ".txt");
                 break;

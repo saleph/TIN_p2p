@@ -227,15 +227,21 @@ void p2p::util::discardDescriptor(FileDescriptor &descriptor) {
 }
 
 in_addr_t p2p::util::findLeastLoadedNode() {
-    if (networkDescriptors.empty()) {
+    Guard guard(mutex);
+    if (networkDescriptors.empty() || nodesAddresses.empty()) {
         return tcpServer->getLocalhostIp();
     }
 
     std::unordered_map<in_addr_t, int> nodesLoad;
 
+    // initialize loads
+    for (auto &&address : nodesAddresses) {
+        nodesLoad[address] = 0;
+    }
+
     // count uses
     for (auto &&descriptor : networkDescriptors) {
-        nodesLoad[descriptor.getHolderIp()]++;
+        nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
     }
 
     // find min element
