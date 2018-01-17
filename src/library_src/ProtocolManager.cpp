@@ -96,7 +96,12 @@ void p2p::startSession() {
 }
 
 void p2p::util::processTcpError(SocketOperation operation) {
-    BOOST_LOG_TRIVIAL(debug) << "TCP error";
+    // we lost the node
+    if (operation.status == SocketOperation::Type::TcpSend) {
+        in_addr_t lostNode = operation.connectionAddr;
+
+    }
+    BOOST_LOG_TRIVIAL(debug) << "Internal TCP error - check your net connection";
 }
 
 void p2p::util::processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation) {
@@ -202,6 +207,7 @@ in_addr_t p2p::util::findLeastLoadedNode() {
 }
 
 in_addr_t p2p::util::findOtherLeastLoadedNode() {
+    Guard guard(mutex);
     if (networkDescriptors.empty() || nodesAddresses.empty()) {
         throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
     }
@@ -210,6 +216,11 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
 
     // map for easier collection of data
     std::unordered_map<in_addr_t, unsigned long> nodesLoad;
+
+    // initialize loads
+    for (auto &&address : nodesAddresses) {
+        nodesLoad[address] = 0;
+    }
 
     // count uses
     for (auto &&descriptor : networkDescriptors) {
@@ -225,7 +236,7 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
                                        });
 
     // if any other node is not found
-    if (mapElement == nodesLoad.end()) {
+    if (mapElement == nodesLoad.end() || mapElement->first == tcpServer->getLocalhostIp()) {
         throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
     }
     return mapElement->first;
