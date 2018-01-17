@@ -118,14 +118,10 @@ void p2p::startSession() {
 
 void p2p::util::processTcpError(SocketOperation operation) {
     // we lost the node
-    if (operation.status == SocketOperation::Status::SendFailed) {
-        in_addr_t lostNode = operation.connectionAddr;
-        BOOST_LOG_TRIVIAL(info) << ">>> CONNECTION_LOST: detected connection lost with " << getFormatedIp(lostNode);
-        // publish this information
-        publishLostNode(lostNode);
-        return;
-    }
-    BOOST_LOG_TRIVIAL(debug) << "Internal TCP error - check your net connection";
+    in_addr_t lostNode = operation.connectionAddr;
+    BOOST_LOG_TRIVIAL(info) << ">>> CONNECTION_LOST: detected connection lost with " << getFormatedIp(lostNode);
+    // publish this information
+    publishLostNode(lostNode);
 }
 
 
@@ -282,19 +278,21 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
         nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
     }
 
+    in_addr_t leastLoadNode{};
+    unsigned long min = ULONG_MAX;
     // find min element
-    auto mapElement = std::min_element(nodesLoad.begin(), nodesLoad.end(),
-                                       [thisNodeAddress](const std::pair<in_addr_t, int> &p1,
-                                                         const std::pair<in_addr_t, int> &p2) {
-                                           // process nodes that differs from the basic
-                                           return p1.second < p2.second && p1.first != thisNodeAddress;
-                                       });
+    for (auto && nodeLoad : nodesLoad) {
+        if (nodeLoad.second < min && nodeLoad.first != thisNodeAddress) {
+            min = nodeLoad.second;
+            leastLoadNode = nodeLoad.first;
+        }
+    }
 
     // if any other node is not found
-    if (mapElement == nodesLoad.end() || mapElement->first == tcpServer->getLocalhostIp()) {
+    if (min == ULONG_MAX) {
         throw std::logic_error("p2p::util::findOtherLeasLoadedNode(): other node not exist");
     }
-    return mapElement->first;
+    return leastLoadNode;
 }
 
 void p2p::util::changeHolderNode(FileDescriptor &descriptor, in_addr_t newNodeAddress) {
