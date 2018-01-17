@@ -71,6 +71,9 @@ namespace p2p {
     }
 
     const char *getFormatedIp(in_addr_t addr) {
+        if (addr == util::tcpServer->getLocalhostIp()) {
+            return "this host";
+        }
         return inet_ntoa(*(in_addr *) &addr);
     }
 }
@@ -468,32 +471,7 @@ bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
         descriptor = *descriptorPointer;
     }
 
-    // check if we are the owner
-    if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
-        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                << " md5: " << hash.getHash()
-                                << " owns " << getFormatedIp(descriptor.getOwnerIp())
-                                << ", NOT YOU";
-        return false;
-    }
-
-    // check if file is stored on our host
-    if (descriptor.getHolderIp() == tcpServer->getLocalhostIp()) {
-        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                << " md5: " << hash.getHash()
-                                << " is present on this host; delete the file";
-        // we already have the file - just rewrite the file
-        FileDeleter loader(descriptor.getMd5().getHash());
-
-        if (!loader.deleteFile()) {
-            BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                    << " md5: " << hash.getHash()
-                                    << " failed! Try again";
-            return false;
-        }
-
-        return true;
-    }
+    // discard descriptor
     util::discardDescriptor(descriptor);
     usleep(10000);
     util::requestDeleteFile(descriptor);
