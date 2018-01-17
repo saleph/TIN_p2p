@@ -281,8 +281,9 @@ void p2p::uploadFile(const std::string &name) {
     newDescriptor.makeValid();
 
     if (leastLoadNodeAddress == thisHostAddress) {
+        // store file with name as its md5
         auto fileContent = util::getFileContent(newDescriptor.getName());
-
+        util::storeFileContent(fileContent, newDescriptor.getMd5().getHash());
 
         // we are the least load node - only publish the descriptor
         util::publishDescriptor(newDescriptor);
