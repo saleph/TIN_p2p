@@ -62,3 +62,27 @@ void FileDescriptor::setName(const std::string& name) {
 	}
 	strcpy(this->name, name.c_str());
 }
+
+void FileDescriptor::makeValid() {
+	valid = true;
+}
+
+void FileDescriptor::makeUnvalid() {
+	valid = false;
+}
+
+bool FileDescriptor::isValid() const {
+	return valid;
+}
+
+FileDescriptor &FileDescriptor::operator=(const FileDescriptor &other) {
+	strcpy(name, other.name);
+    md5 = other.md5;
+    size = other.size;
+    uploadTime = other.uploadTime;
+    ownerIp = other.ownerIp;
+    holderIp = other.holderIp;
+    valid = other.valid;
+
+    return *this;
+}

@@ -30,6 +30,19 @@ public:
 	std::string getHash() const {
 		return std::string(hash);
 	}
+
+	Md5Hash &operator=(const Md5Hash &other) {
+		strcpy(hash, other.hash);
+		return *this;
+	}
+
+	bool operator==(const Md5Hash &other) const {
+		return !strcmp(hash, other.hash);
+	}
+
+    bool operator!=(const Md5Hash &other) const {
+        return !operator==(other);
+    }
 };
 
 #endif /* INCLUDE_MD5HASH_HPP_ */

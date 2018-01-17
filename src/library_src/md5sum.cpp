@@ -25,7 +25,8 @@ Md5Hash Md5sum::getMd5Hash() const {
 }
 
 Md5sum::Md5sum(std::istream &stream) {
-    std::string fileContent{std::istreambuf_iterator<char>(stream), {}};
+	std::string fileContent((std::istreambuf_iterator<char>(stream)),
+							 std::istreambuf_iterator<char>());
 
     std::array<char, 500> buffer {0};
     std::string cmd = "echo \"" + fileContent + "\" | md5sum";

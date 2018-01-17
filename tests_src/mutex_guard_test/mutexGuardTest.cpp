@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(checkMutexLocksThread)
 			args3(&m, &n3, &run3);
 
 	pthread_create( &thread1, NULL, incrementFunc, &args1);
-	usleep(10000);
+	usleep(25000);
 	pthread_create( &thread2, NULL, incrementFunc, &args2);
 	pthread_create( &thread3, NULL, incrementFunc, &args3);
 
@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(checkMutexLocksThread)
 	BOOST_TEST(n3 == 0);
 
 	run1 = false;
-	usleep(10000);
+	usleep(25000);
 
 	BOOST_TEST( ((n2 != 0 && n3 == 0) || (n2 == 0 && n3 != 0)) );
 	run2 = false;
