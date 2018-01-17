@@ -72,7 +72,7 @@ namespace p2p {
 
     const char *getFormatedIp(in_addr_t addr) {
         if (addr == util::tcpServer->getLocalhostIp()) {
-            return "this host";
+            return ">>THIS HOST<<";
         }
         return inet_ntoa(*(in_addr *) &addr);
     }
@@ -408,9 +408,9 @@ bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                           [&hash](const FileDescriptor &fd) {
-                                               return fd.getMd5() == hash ;
-                                           });
+                                              [&hash](const FileDescriptor &fd) {
+                                                  return fd.getMd5() == hash;
+                                              });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
                                     << " md5: " << hash.getHash()
@@ -443,7 +443,7 @@ void p2p::util::requestGetFile(FileDescriptor &descriptor) {
     message.setAdditionalDataSize(sizeof(FileDescriptor));
 
     // prepare buffer
-    std::vector<uint8_t>buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
+    std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
     memcpy(buffer.data(), &message, sizeof(P2PMessage));
     memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
 
@@ -459,9 +459,9 @@ bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                           [&hash](const FileDescriptor &fd) {
-                                               return fd.getMd5() == hash ;
-                                           });
+                                              [&hash](const FileDescriptor &fd) {
+                                                  return fd.getMd5() == hash;
+                                              });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
                                     << " md5: " << hash.getHash()
@@ -597,7 +597,10 @@ void p2p::util::initProcessingFunctions() {
                                                     return fileDescriptor.getHolderIp() == lostNodeAddress;
                                                 }));
         // remove node address from space
-        nodesAddresses.erase(std::remove(nodesAddresses.begin(), nodesAddresses.end(), lostNodeAddress));
+        nodesAddresses.erase(std::remove_if(nodesAddresses.begin(), nodesAddresses.end(),
+                                            [sourceAddress](const in_addr_t &addr) {
+                                                return sourceAddress == addr;
+                                            }), nodesAddresses.end());
         BOOST_LOG_TRIVIAL(debug) << "<<< CONNECTION_LOST: with node " << lostNodeAddress
                                  << "; lost " << lostDescriptorsNumber << " descriptors";
     };
@@ -622,7 +625,10 @@ void p2p::util::initProcessingFunctions() {
 
         Guard guard(mutex);
         // remove all associated data
-        nodesAddresses.erase(std::remove(nodesAddresses.begin(), nodesAddresses.end(), sourceAddress));
+        nodesAddresses.erase(std::remove_if(nodesAddresses.begin(), nodesAddresses.end(),
+                                            [sourceAddress](const in_addr_t &addr) {
+                                                return sourceAddress == addr;
+                                            }), nodesAddresses.end());
         networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
                                                 [sourceAddress](const FileDescriptor &fileDescriptor) {
                                                     return fileDescriptor.getHolderIp() == sourceAddress;
