@@ -73,11 +73,12 @@ namespace p2p {
 
 void p2p::endSession() {
     util::quitFromNetwork();
-    // wait for our discards
-    usleep(1000);
-    Guard guard(util::mutex);
-    util::tcpServer->stopListening();
     util::udpServer->stopListening();
+    util::tcpServer->stopListening();
+
+    // wait for performed actions
+    usleep(10000);
+    Guard guard(util::mutex);
     util::tcpServer.reset();
     util::tcpServer.reset();
     // prevent corruption
