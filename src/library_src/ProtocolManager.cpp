@@ -68,6 +68,11 @@ namespace p2p {
         void requestGetFile(FileDescriptor &descriptor);
 
         void requestDeleteFile(FileDescriptor &descriptor);
+
+        bool isDescriptorUnique(FileDescriptor &descriptor);
+
+        FileDescriptor &getRepetedDescriptor(FileDescriptor &descriptor);
+
     }
 
     const char *getFormatedIp(in_addr_t addr) {
@@ -328,7 +333,8 @@ void p2p::util::storeFileContent(std::vector<uint8_t> &content, const std::strin
     storer.storeFile(content);
 }
 
-void p2p::uploadFile(const std::string &name) {
+bool p2p::uploadFile(const std::string &name) {
+    using namespace util;
     // create new descriptor (autofill MD5 and its size)
     FileDescriptor newDescriptor(name);
 
@@ -348,6 +354,17 @@ void p2p::uploadFile(const std::string &name) {
     // make descriptor valid
     newDescriptor.makeValid();
 
+    // check if descriptor is unique
+    {
+        Guard guard(mutex);
+        if (!isDescriptorUnique(newDescriptor)) {
+            BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: hashes collision! " << newDescriptor.getName()
+                                     << " md5: " << newDescriptor.getMd5().getHash()
+                                     << "; choose another file!";
+            return false;
+        }
+    }
+
     if (leastLoadNodeAddress == thisHostAddress) {
         // store file with name as its md5
         auto fileContent = util::getFileContent(newDescriptor.getName());
@@ -359,12 +376,13 @@ void p2p::uploadFile(const std::string &name) {
 
         Guard guard(util::mutex);
         util::localDescriptors.push_back(newDescriptor);
-        return;
+        return true;
     }
 
     util::uploadFile(newDescriptor);
     BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName()
                              << " saved in node " << getFormatedIp(leastLoadNodeAddress);
+    return true;
 }
 
 void p2p::util::publishDescriptor(FileDescriptor &descriptor) {
@@ -638,17 +656,37 @@ void p2p::util::initProcessingFunctions() {
 
     // new file descriptor received - put it into network descriptors list
     msgProcessors[MessageType::NEW_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        if (size != sizeof(FileDescriptor)) {
-            throw std::runtime_error("NEW_FILE: received data is not a descriptor");
-        }
         FileDescriptor newFileDescriptor = *(FileDescriptor *) data;
+
+        // check collisions
+        Guard guard(mutex);
+        if (!isDescriptorUnique(newFileDescriptor)) {
+            FileDescriptor repetedDescriptor = getRepetedDescriptor(newFileDescriptor);
+
+            BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: hashes collision! md5: "
+                                     << repetedDescriptor.getMd5().getHash()
+                                     << " upload times (old, new): "
+                                     << repetedDescriptor.getUploadTime() << " vs "
+                                     << newFileDescriptor.getUploadTime()
+                                     << "; earlier file choosen";
+
+            if (repetedDescriptor.getUploadTime() > newFileDescriptor.getUploadTime()) {
+                networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
+                [&repetedDescriptor](const FileDescriptor &fd) {
+                    return fd.getMd5() == repetedDescriptor.getMd5();
+                }));
+                networkDescriptors.push_back(newFileDescriptor);
+            }
+            return;
+        }
+
+        // normal insert
+        networkDescriptors.push_back(newFileDescriptor);
 
         BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
                                  << " md5: " << newFileDescriptor.getMd5().getHash()
                                  << " in node: " << getFormatedIp(sourceAddress);
 
-        Guard guard(mutex);
-        networkDescriptors.push_back(newFileDescriptor);
     };
 
     msgProcessors[MessageType::REVOKE_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
@@ -907,4 +945,21 @@ void p2p::util::sendCommandRefused(MessageType messageType, const char *msg, in_
     memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(MessageType), msg, stringSize);
 
     tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
+}
+
+bool p2p::util::isDescriptorUnique(FileDescriptor &descriptor) {
+    for (auto &&networkDescriptor : networkDescriptors) {
+        if (networkDescriptor.getMd5() == descriptor.getMd5()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+FileDescriptor &p2p::util::getRepetedDescriptor(FileDescriptor &descriptor) {
+    for (auto &&networkDescriptor : networkDescriptors) {
+        if (networkDescriptor.getMd5() == descriptor.getMd5()) {
+            return networkDescriptor;
+        }
+    }
 }
