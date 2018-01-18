@@ -65,7 +65,7 @@ int UserInterface::checkInput(const std::string &inputString) {
             return 6;
         }
         for (int i = 1; i < tokens.size(); i++) {
-            p2p::deleteFile(tokens[i], Md5sum(tokens[i]).getMd5Hash());
+            p2p::deleteFile(tokens[i]);
         }
         return 7;
     }
@@ -77,7 +77,7 @@ int UserInterface::checkInput(const std::string &inputString) {
         }
 
         for (int i = 1; i < tokens.size(); i++) {
-            p2p::getFile(tokens[i], Md5sum(tokens[i]).getMd5Hash());
+            p2p::getFile(tokens[i]);
         }
         return 9;
     }

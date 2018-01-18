@@ -71,6 +71,10 @@ namespace p2p {
 
         bool isDescriptorUnique(FileDescriptor &descriptor);
 
+        bool getFile(FileDescriptor &descriptor);
+
+        bool deleteFile(FileDescriptor &descriptor);
+
         FileDescriptor &getRepetedDescriptor(FileDescriptor &descriptor);
 
     }
@@ -419,27 +423,68 @@ void p2p::util::uploadFile(FileDescriptor &descriptor) {
     tcpServer->sendData(buffer.data(), buffer.size(), holderNode);
 }
 
-bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
+
+
+bool p2p::getFile(const std::string &name) {
+    using namespace util;
+    FileDescriptor descriptor;
+    {
+        Guard guard(mutex);
+
+        // find repetitions
+        long filesWithSameName = std::count_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                               [&name](const FileDescriptor &fd) {
+                                                   return fd.getName() == name;
+                                               });
+
+        if (filesWithSameName > 1) {
+            BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
+                                    << " hashes collision! Use command <filename> <md5>";
+            return false;
+        }
+
+        auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                              [&name](const FileDescriptor &fd) {
+                                                  return fd.getName() == name;
+                                              });
+        if (descriptorPointer == networkDescriptors.end()) {
+            BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
+                                    << " does not exists in the network, try again";
+            return false;
+        }
+        descriptor = *descriptorPointer;
+    }
+
+    return getFile(descriptor);
+}
+
+bool p2p::getFile(const std::string &name, const std::string &hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
                                               [&hash](const FileDescriptor &fd) {
-                                                  return fd.getMd5() == hash;
+                                                  return fd.getMd5().getHash() == hash;
                                               });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
-                                    << " md5: " << hash.getHash()
+                                    << " md5: " << hash
                                     << " does not exists in the network, try again";
             return false;
         }
         descriptor = *descriptorPointer;
     }
+
+    return getFile(descriptor);
+}
+
+bool p2p::util::getFile(FileDescriptor &descriptor) {
+    using namespace util;
     // check if file is stored on our host
     if (descriptor.getHolderIp() == tcpServer->getLocalhostIp()) {
-        BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
-                                << " md5: " << hash.getHash()
+        BOOST_LOG_TRIVIAL(info) << "===> getFile: " << descriptor.getName()
+                                << " md5: " << descriptor.getMd5().getHash()
                                 << " is present on >>THIS HOST<<; rewrite the file";
         // we already have the file - just rewrite the file
         FileLoader loader(descriptor.getMd5().getHash());
@@ -452,7 +497,6 @@ bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
     util::requestGetFile(descriptor);
     return true;
 }
-
 
 void p2p::util::requestGetFile(FileDescriptor &descriptor) {
     P2PMessage message{};
@@ -470,31 +514,71 @@ void p2p::util::requestGetFile(FileDescriptor &descriptor) {
                              << " md5: " << descriptor.getMd5().getHash();
 }
 
-bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
+bool p2p::deleteFile(const std::string &name, const std::string &hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
                                               [&hash](const FileDescriptor &fd) {
-                                                  return fd.getMd5() == hash;
+                                                  return fd.getMd5().getHash() == hash;
                                               });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                    << " md5: " << hash.getHash()
+                                    << " md5: " << hash
                                     << " does not exists in the network, try again";
             return false;
         }
         descriptor = *descriptorPointer;
+    }
 
-        // check unauthorized access
-        if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
+    return deleteFile(descriptor);
+}
+
+bool p2p::deleteFile(const std::string &name) {
+    using namespace util;
+    FileDescriptor descriptor;
+    {
+        Guard guard(mutex); // find repetitions
+        long filesWithSameName = std::count_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                               [&name](const FileDescriptor &fd) {
+                                                   return fd.getName() == name;
+                                               });
+
+        if (filesWithSameName > 1) {
             BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                    << " md5: " << hash.getHash()
-                                    << " you are not the owner! Owner ip: "
-                                    << getFormatedIp(descriptor.getOwnerIp());
+                                    << " hashes collision! Use command <filename> <md5>";
             return false;
         }
+
+        auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                              [&name](const FileDescriptor &fd) {
+                                                  return fd.getName() == name;
+                                              });
+
+        if (descriptorPointer == networkDescriptors.end()) {
+            BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
+                                    << " does not exists in the network, try again";
+            return false;
+        }
+        descriptor = *descriptorPointer;
+    }
+
+    return deleteFile(descriptor);
+}
+
+
+
+bool p2p::util::deleteFile(FileDescriptor &descriptor) {
+    using namespace util;
+
+    // check unauthorized access
+    if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
+        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << descriptor.getName()
+                                << " md5: " << descriptor.getMd5().getHash()
+                                << " you are not the owner! Owner ip: "
+                                << getFormatedIp(descriptor.getOwnerIp());
+        return false;
     }
 
     // discard descriptor
@@ -503,7 +587,6 @@ bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
     util::requestDeleteFile(descriptor);
     return true;
 }
-
 
 void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
     P2PMessage message{};

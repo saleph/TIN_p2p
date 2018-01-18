@@ -19,8 +19,10 @@ namespace p2p {
     std::vector<FileDescriptor> getLocalFileDescriptors();
     std::vector<FileDescriptor> getNetworkFileDescriptors();
     bool uploadFile(const std::string &name);
-    bool getFile(const std::string &name, const Md5Hash &hash);
-    bool deleteFile(const std::string &name, const Md5Hash &hash);
+    bool getFile(const std::string &name);
+    bool getFile(const std::string &name, const std::string &hash);
+    bool deleteFile(const std::string &name);
+    bool deleteFile(const std::string &name, const std::string &hash);
 
 };
 
