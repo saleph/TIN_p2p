@@ -3,8 +3,7 @@
 #include <FileLoader.hpp>
 #include <signal.h>
 
-UserInterface::UserInterface()
-{ }
+UserInterface::UserInterface() {}
 
 void UserInterface::start() {
     std::cout << "TIN p2p" << std::endl;
@@ -17,7 +16,7 @@ void UserInterface::start() {
             getline(std::cin, inputString);
             canFinish = checkInput(inputString);
         }
-        catch (std::invalid_argument&) {
+        catch (std::invalid_argument &) {
             std::cout << "This file does not exist" << std::endl;
         }
     } while (canFinish != 0);
@@ -70,6 +69,17 @@ int UserInterface::checkInput(const std::string &inputString) {
         return 7;
     }
 
+    if (tokens[0] == "deletemd5" || tokens[0] == "dmd5") {
+        if (!isConnected) {
+            std::cout << "Node is disconnected" << std::endl;
+            return 6;
+        }
+        for (int i = 1; i < tokens.size(); i += 2) {
+            p2p::deleteFile(tokens[i], tokens[i + 1]);
+        }
+        return 7;
+    }
+
     if (tokens[0] == "get" || tokens[0] == "g") {
         if (!isConnected) {
             std::cout << "Node is disconnected" << std::endl;
@@ -78,6 +88,19 @@ int UserInterface::checkInput(const std::string &inputString) {
 
         for (int i = 1; i < tokens.size(); i++) {
             p2p::getFile(tokens[i]);
+        }
+        return 9;
+    }
+
+
+    if (tokens[0] == "getmd5" || tokens[0] == "gmd5") {
+        if (!isConnected) {
+            std::cout << "Node is disconnected" << std::endl;
+            return 8;
+        }
+
+        for (int i = 1; i < tokens.size(); i += 2) {
+            p2p::getFile(tokens[i], tokens[i + 1]);
         }
         return 9;
     }
@@ -135,14 +158,15 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
 }
 
 void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescriptors) {
+    std::cout << std::endl;
     for (int i = 0; i < fileDescriptors.size(); i++) {
-        std::cout << std::endl;
         std::cout << "name: " << fileDescriptors[i].getName();
         std::cout << " md5: " << fileDescriptors[i].getMd5().getHash();
         std::cout << " owner: " << p2p::getFormatedIp(fileDescriptors[i].getOwnerIp());
         std::cout << " holder: " << p2p::getFormatedIp(fileDescriptors[i].getHolderIp());
         std::cout << std::endl;
     }
+    std::cout << std::endl;
 }
 
 
@@ -153,7 +177,9 @@ void UserInterface::help() {
     std::cout << "disconnect" << std::endl;
     std::cout << "upload <filenames>" << std::endl;
     std::cout << "delete <filenames>" << std::endl;
+    std::cout << "deletemd5 <filenames> <md5>" << std::endl;
     std::cout << "get <filenames>" << std::endl;
+    std::cout << "getmd5 <filenames> <md5>" << std::endl;
     std::cout << "saf (show all files in network)" << std::endl;
     std::cout << "slf (show local files)" << std::endl;
     std::cout << "help" << std::endl;
