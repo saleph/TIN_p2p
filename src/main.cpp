@@ -3,9 +3,6 @@
 #include "UserInterface.hpp"
 
 int main() {
-
-
-
     UserInterface userInterface;
-
+    userInterface.start();
 }

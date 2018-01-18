@@ -1,14 +1,35 @@
 #include "UserInterface.hpp"
 #include "ProtocolManager.hpp"
 #include <FileLoader.hpp>
+#include <signal.h>
+
+void sigHandler(int dummy) {
+    p2p::endSession();
+}
+
 
 
 UserInterface::UserInterface() {
-    std::string inputString;
+    signal(SIGINT, sigHandler);
 
+
+}
+
+void UserInterface::start() {
+    std::cout << "TIN p2p" << std::endl;
+    std::cout << "START" << std::endl;
+    help();
+    std::string inputString;
+    bool canFinish;
     do {
-        getline(std::cin, inputString);
-    } while (checkInput(inputString)!= 0);
+        try {
+            getline(std::cin, inputString);
+            canFinish = checkInput(inputString);
+        }
+        catch (std::invalid_argument) {
+            std::cout << "This file does not exist" << std::endl;
+        }
+    } while (canFinish != 0);
 }
 
 int UserInterface::checkInput(const std::string &inputString) {
@@ -101,6 +122,13 @@ int UserInterface::checkInput(const std::string &inputString) {
         showFileDescriptors(fileDecriptors);
         return 13;
     }
+
+    if (tokens[0] == "help") {
+        help();
+        return 14;
+    }
+
+    std::cout << "Incorrect command" << std::endl;
 }
 
 std::vector<std::string> UserInterface::split(const std::string &inputStream, char delim) {
@@ -117,11 +145,27 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
 
 void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescriptors) {
     for (int i = 0; i < fileDescriptors.size(); i++) {
+        std::cout << std::endl;
         std::cout << "name: " << fileDescriptors[i].getName();
         std::cout << " md5: " << fileDescriptors[i].getMd5().getHash();
-        std::cout << " owner :" << fileDescriptors[i].getOwnerIp();
+        std::cout << " owner: " << fileDescriptors[i].getOwnerIp();
         std::cout << " holder: " << fileDescriptors[i].getHolderIp();
         std::cout << std::endl;
     }
 }
+
+
+void UserInterface::help() {
+    std::cout << std::endl;
+    std::cout << "Available commands:" << std::endl;
+    std::cout << "connect" << std::endl;
+    std::cout << "disconnect" << std::endl;
+    std::cout << "upload <filenames>" << std::endl;
+    std::cout << "delete <filenames>" << std::endl;
+    std::cout << "get <filenames>" << std::endl;
+    std::cout << "saf (show all files in network)" << std::endl;
+    std::cout << "slf (show local files)" << std::endl;
+    std::cout << "help" << std::endl;
+    std::cout << std::endl;
+};
 
