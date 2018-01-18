@@ -13,6 +13,7 @@
 #include <vector>
 
 namespace p2p {
+    const char *getFormatedIp(in_addr_t addr);
     void startSession();
     void endSession();
     std::vector<FileDescriptor> getLocalFileDescriptors();
@@ -20,6 +21,7 @@ namespace p2p {
     bool uploadFile(const std::string &name);
     bool getFile(const std::string &name, const Md5Hash &hash);
     bool deleteFile(const std::string &name, const Md5Hash &hash);
+
 };
 
 

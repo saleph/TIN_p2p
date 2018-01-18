@@ -3,30 +3,21 @@
 #include <FileLoader.hpp>
 #include <signal.h>
 
-void sigHandler(int dummy) {
-    p2p::endSession();
-}
-
-
-
-UserInterface::UserInterface() {
-    signal(SIGINT, sigHandler);
-
-
-}
+UserInterface::UserInterface()
+{ }
 
 void UserInterface::start() {
     std::cout << "TIN p2p" << std::endl;
     std::cout << "START" << std::endl;
     help();
     std::string inputString;
-    bool canFinish;
+    int canFinish = 1;
     do {
         try {
             getline(std::cin, inputString);
             canFinish = checkInput(inputString);
         }
-        catch (std::invalid_argument) {
+        catch (std::invalid_argument&) {
             std::cout << "This file does not exist" << std::endl;
         }
     } while (canFinish != 0);
@@ -35,7 +26,7 @@ void UserInterface::start() {
 int UserInterface::checkInput(const std::string &inputString) {
     std::vector<std::string> tokens = split(inputString, ' ');
 
-    if (tokens[0] == "connect") {
+    if (tokens[0] == "connect" || tokens[0] == "c") {
         if (isConnected) {
             std::cout << "Node is already connected" << std::endl;
             return 2;
@@ -46,7 +37,7 @@ int UserInterface::checkInput(const std::string &inputString) {
         return 1;
     }
 
-    if (tokens[0] == "disconnect") {
+    if (tokens[0] == "disconnect" || tokens[0] == "diss") {
         if (!isConnected) {
             std::cout << "Node is disconnected" << std::endl;
             return 3;
@@ -56,7 +47,7 @@ int UserInterface::checkInput(const std::string &inputString) {
         return 0;
     }
 
-    if (tokens[0] == "upload") {
+    if (tokens[0] == "upload" || tokens[0] == "u") {
         if (!isConnected) {
             std::cout << "Node is disconnected" << std::endl;
             return 4;
@@ -68,7 +59,7 @@ int UserInterface::checkInput(const std::string &inputString) {
         return 5;
     }
 
-    if (tokens[0] == "delete") {
+    if (tokens[0] == "delete" || tokens[0] == "d") {
         if (!isConnected) {
             std::cout << "Node is disconnected" << std::endl;
             return 6;
@@ -79,7 +70,7 @@ int UserInterface::checkInput(const std::string &inputString) {
         return 7;
     }
 
-    if (tokens[0] == "get") {
+    if (tokens[0] == "get" || tokens[0] == "g") {
         if (!isConnected) {
             std::cout << "Node is disconnected" << std::endl;
             return 8;
@@ -148,8 +139,8 @@ void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescript
         std::cout << std::endl;
         std::cout << "name: " << fileDescriptors[i].getName();
         std::cout << " md5: " << fileDescriptors[i].getMd5().getHash();
-        std::cout << " owner: " << fileDescriptors[i].getOwnerIp();
-        std::cout << " holder: " << fileDescriptors[i].getHolderIp();
+        std::cout << " owner: " << p2p::getFormatedIp(fileDescriptors[i].getOwnerIp());
+        std::cout << " holder: " << p2p::getFormatedIp(fileDescriptors[i].getHolderIp());
         std::cout << std::endl;
     }
 }

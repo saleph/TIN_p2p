@@ -74,13 +74,14 @@ namespace p2p {
         FileDescriptor &getRepetedDescriptor(FileDescriptor &descriptor);
 
     }
+}
 
-    const char *getFormatedIp(in_addr_t addr) {
-        if (addr == util::tcpServer->getLocalhostIp()) {
-            return ">>THIS HOST<<";
-        }
-        return inet_ntoa(*(in_addr *) &addr);
+
+const char *p2p::getFormatedIp(in_addr_t addr) {
+    if (addr == util::tcpServer->getLocalhostIp()) {
+        return ">>THIS HOST<<";
     }
+    return inet_ntoa(*(in_addr *) &addr);
 }
 
 void p2p::endSession() {
@@ -370,7 +371,7 @@ bool p2p::uploadFile(const std::string &name) {
 
         // we are the least load node - only publish the descriptor
         util::publishDescriptor(newDescriptor);
-        BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on this host";
+        BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on >>THIS HOST<<";
 
         Guard guard(util::mutex);
         util::localDescriptors.push_back(newDescriptor);
@@ -439,7 +440,7 @@ bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
     if (descriptor.getHolderIp() == tcpServer->getLocalhostIp()) {
         BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
                                 << " md5: " << hash.getHash()
-                                << " is present on this host; rewrite the file";
+                                << " is present on >>THIS HOST<<; rewrite the file";
         // we already have the file - just rewrite the file
         FileLoader loader(descriptor.getMd5().getHash());
         auto content = loader.getContent();
@@ -972,9 +973,13 @@ FileDescriptor &p2p::util::getRepetedDescriptor(FileDescriptor &descriptor) {
 }
 
 std::vector<FileDescriptor> p2p::getLocalFileDescriptors() {
+    using namespace util;
+    Guard guard(mutex);
     return util::localDescriptors;
 }
 
 std::vector<FileDescriptor> p2p::getNetworkFileDescriptors() {
+    using namespace util;
+    Guard guard(mutex);
     return util::networkDescriptors;
 }
