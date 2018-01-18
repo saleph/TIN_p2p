@@ -970,3 +970,11 @@ FileDescriptor &p2p::util::getRepetedDescriptor(FileDescriptor &descriptor) {
         }
     }
 }
+
+std::vector<FileDescriptor> p2p::getLocalFileDescriptors() {
+    return util::localDescriptors;
+}
+
+std::vector<FileDescriptor> p2p::getNetworkFileDescriptors() {
+    return util::networkDescriptors;
+}
