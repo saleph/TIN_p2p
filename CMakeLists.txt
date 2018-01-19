@@ -26,7 +26,7 @@ message(STATUS "TESTS_FILES " ${TESTS_SOURCE_FILES})
 #message(STATUS "INTEGRATION_TESTS_FILES " ${INTEGRATION_TESTS_SOURCE_FILES})
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
-set(LIBS ${Boost_LIBRARIES} pthread)
+set(LIBS ${Boost_LIBRARIES} pthread )
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES} ${APP_INCLUDE_FILES})
 target_link_libraries(${LIB_NAME} ${LIBS})

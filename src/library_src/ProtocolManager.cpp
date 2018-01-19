@@ -1,3 +1,4 @@
+#include <thread>
 #include "ProtocolManager.hpp"
 
 // definitions HAVE TO BE THERE
@@ -602,57 +603,4 @@ std::vector<FileDescriptor> p2p::getNetworkFileDescriptors() {
     using namespace util;
     Guard guard(mutex);
     return util::networkDescriptors;
-}
-
-uint32_t p2p::util::getAverageNodesLoad() {
-    Guard guard(mutex);
-
-    // map for easier collection of data
-    std::unordered_map<in_addr_t, uint32_t> nodesLoad;
-
-    nodesLoad[tcpServer->getLocalhostIp()] = 0;
-
-    // initialize loads
-    for (auto &&address : nodesAddresses) {
-        nodesLoad[address] = 0;
-    }
-
-    // count uses
-    for (auto &&descriptor : networkDescriptors) {
-        nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
-    }
-
-    uint32_t sum = 0;
-    for (auto &&nodeLoad : nodesLoad) {
-        sum += nodeLoad.second;
-    }
-
-    return sum / (uint32_t)nodesLoad.size();
-}
-
-uint32_t p2p::util::getThisNodeLoad() {
-    Guard guard(mutex);
-
-    uint32_t sum = 0;
-    for (auto &&localDescriptor : localDescriptors) {
-        sum += localDescriptor.getSize();
-    }
-
-    return sum;
-}
-
-void p2p::util::moveFilesWithSumaricSizeToNode(int64_t sizeToMove, in_addr_t sourceAddress) {
-    Guard guard(mutex);
-
-    // iterate over local descriptor
-    for (auto it = localDescriptors.begin(); it != localDescriptors.end() && sizeToMove > 0;) {
-        if (it->getSize() <= sizeToMove)  {
-            sizeToMove -= it->getSize();
-            // do "HOLDER_CHANGE"
-            changeHolderNode(*it, sourceAddress);
-            it = localDescriptors.erase(it);
-        } else {
-            ++it;
-        }
-    }
 }
