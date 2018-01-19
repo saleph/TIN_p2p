@@ -32,18 +32,18 @@ void p2p::util::initProcessingFunctions() {
         // send message
         util::tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
 
-        // NETWORK BALANCING
-        // estimate new average node load
-        uint32_t averageNodesLoad = getAverageNodesLoad();
-        uint32_t thisNodeLoad = getThisNodeLoad();
-        int64_t sizeToMoveFromThisNode = thisNodeLoad - averageNodesLoad;
-
-        if (sizeToMoveFromThisNode < 0) {
-            // nothing to send from this node
-            return;
-        }
-
-        moveFilesWithSumaricSizeToNode(sizeToMoveFromThisNode, sourceAddress);
+//        // NETWORK BALANCING
+//        // estimate new average node load
+//        uint32_t averageNodesLoad = getAverageNodesLoad();
+//        uint32_t thisNodeLoad = getThisNodeLoad();
+//        int64_t sizeToMoveFromThisNode = thisNodeLoad - averageNodesLoad;
+//
+//        if (sizeToMoveFromThisNode < 0) {
+//            // nothing to send from this node
+//            return;
+//        }
+//
+//        moveFilesWithSumaricSizeToNode(sizeToMoveFromThisNode, sourceAddress);
     };
 
     // replay for other nodes
