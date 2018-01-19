@@ -31,6 +31,19 @@ void p2p::util::initProcessingFunctions() {
 
         // send message
         util::tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
+
+        // NETWORK BALANCING
+        // estimate new average node load
+        uint32_t averageNodesLoad = getAverageNodesLoad();
+        uint32_t thisNodeLoad = getThisNodeLoad();
+        int64_t sizeToMoveFromThisNode = thisNodeLoad - averageNodesLoad;
+
+        if (sizeToMoveFromThisNode < 0) {
+            // nothing to send from this node
+            return;
+        }
+
+        moveFilesWithSumaricSizeToNode(sizeToMoveFromThisNode, sourceAddress);
     };
 
     // replay for other nodes
@@ -59,10 +72,13 @@ void p2p::util::initProcessingFunctions() {
         // put descriptors
         memcpy((uint8_t *) buffer.data(), data, size);
 
-        Guard guard(mutex);
-        // preserve source address
-        nodesAddresses.push_back(sourceAddress);
-        networkDescriptors.insert(networkDescriptors.end(), buffer.begin(), buffer.end());
+        // gather descriptors
+        {
+            Guard guard(mutex);
+            // preserve source address
+            nodesAddresses.push_back(sourceAddress);
+            networkDescriptors.insert(networkDescriptors.end(), buffer.begin(), buffer.end());
+        }
     };
 
     // message sent by node, which starts shutdown; discards every his descriptor

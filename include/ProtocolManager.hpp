@@ -24,6 +24,14 @@ namespace p2p {
     namespace util {
         extern std::unordered_map<MessageType, std::function<void(const uint8_t *, uint32_t, in_addr_t)>> msgProcessors;
         void initProcessingFunctions();
+
+        uint32_t getAverageNodesLoad();
+
+
+        uint32_t getThisNodeLoad();
+
+        void moveFilesWithSumaricSizeToNode(int64_t sourceAddress, in_addr_t i);
+
     }
 
     const char *getFormatedIp(in_addr_t addr);
