@@ -472,21 +472,6 @@ void p2p::util::initProcessingFunctions() {
         // file was discarded already by request node - we have to delete it and publish REVOKE
         FileDescriptor descriptor = *(FileDescriptor *) data;
 
-        {
-            Guard guard(mutex);
-            // check validity of file requested to delete
-            for (auto &&localDescriptor : localDescriptors) {
-                if (localDescriptor.getMd5() == descriptor.getMd5() && !localDescriptor.isValid()) {
-                    // request for discarded file
-                    sendCommandRefused(MessageType::GET_FILE,
-                                       "delete request for discarded file! try again for a while",
-                                       sourceAddress);
-                    // do not delete the file
-                    return;
-                }
-            }
-        }
-
         FileDeleter deleter(descriptor.getMd5().getHash());
         if (!deleter.deleteFile()) {
             // error - file should exsist
