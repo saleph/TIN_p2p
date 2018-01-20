@@ -92,5 +92,31 @@ Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje oso
 
 ![współbieżność](https://github.com/saleph/TIN_p2p/blob/master/docs/concurrencydiagram.png "Realizacja współbieżności")
 
+## 6) Interfejs użytkownika
+Interfejs użytkownika implementuje podstawowe akcje do wykonania w stosunku do sieci.
+```
+Available commands:
+1. connect
+2. disconnect
+3. upload <filenames>
+4. delete <filenames>
+5. deletemd5 <filenames> <md5>
+6. get <filenames>
+7. getmd5 <filenames> <md5>
+8. saf (show all files in network)
+9. slf (show local files)
+10. help
+```
+
+- `connect`/`disconnect` nawiązuje/kończy sesję P2P w sieci,
+- `upload` uploaduje plik do sieci (miejsce jego fizycznego składowania zostanie przydzielone automatycznie),
+- `delete` usuwa plik z sieci (ale tylko, jeśli wydającym komendę usunięcia jest jego właściciel),
+- `get` pobiera plik z sieci (samoczynnie odnajduje węzeł przechowujący),
+- `saf` listuje pliki znajdujące się w sieci,
+- `slf` listuje pliki przechowywane w tym węźle.
+
+Wersje z dodatkowym hashem MD5 są konieczne tylko w przypadku, kiedy wybraliśmy plik, który posiada swoje odpowiedniki o tych samych nazwach (ale różnej zawartości!). W takim wypadku interfejs sam poprosi nas o użycie odpowiedniej komendy.
+Ścieżki do plików są rozwijane względem katalogu uruchomienia głównej binarki.
+
 ## 6) Zarys koncepcji implementacji
-Użyty zostanie C++ (jako pomoc przy budowie CLI oraz obsługi przesyłanych struktur w stopniu podstawowym - np. modyfikacje strumenia, struktury `std::vector` jako bufory) wraz z częścią biblioteki `BOOST` - do przeprowadzania unit-testów oraz zbierania logów. Do obsługi współbieżności zostaną użyte POSIXowe `pthreads`, a do obsługi sieci - gniazda BSD.
+Użyliśmy C++ (jako pomoc przy budowie CLI oraz obsługi przesyłanych struktur w stopniu podstawowym - np. modyfikacje strumenia, struktury `std::vector` jako bufory) wraz z częścią biblioteki `BOOST` - do przeprowadzania unit-testów oraz zbierania logów. Do obsługi współbieżności zostaną użyte POSIXowe `pthreads`, a do obsługi sieci - gniazda BSD.
