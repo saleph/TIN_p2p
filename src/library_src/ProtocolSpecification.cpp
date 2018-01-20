@@ -8,9 +8,11 @@ void p2p::util::initProcessingFunctions() {
             return;
         }
         BOOST_LOG_TRIVIAL(debug) << "<<< HELLO from: " << getFormatedIp(sourceAddress);
-        Guard guard(mutex);
-        // save node address for later
-        nodesAddresses.push_back(sourceAddress);
+        {
+            Guard guard(mutex);
+            // save node address for later
+            nodesAddresses.push_back(sourceAddress);
+        }
 
         // construct p2pmessage
         P2PMessage message = {};
