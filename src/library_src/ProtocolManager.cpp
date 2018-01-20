@@ -542,7 +542,7 @@ void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
 }
 
 void p2p::util::removeDuplicatesFromLists() {
-    Guard guard(mutex);
+    // mutex already acquired
     auto descriptorSorter = [](const FileDescriptor &fd1, const FileDescriptor &fd2) {
         return fd1.getMd5().getHash() > fd2.getMd5().getHash();
     };

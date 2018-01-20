@@ -106,6 +106,12 @@ void p2p::util::initProcessingFunctions() {
                 descriptor.makeUnvalid();
             }
         }
+
+        // prevent choosing disconnecting node from being choosed as holder for new file
+        nodesAddresses.erase(std::remove_if(nodesAddresses.begin(), nodesAddresses.end(),
+                                            [sourceAddress](const in_addr_t &addr) {
+                                                return sourceAddress == addr;
+                                            }), nodesAddresses.end());
         BOOST_LOG_TRIVIAL(debug) << "<<< DISCONNECTING: node " << sourceAddress << " start disconnecting";
     };
 
@@ -159,11 +165,14 @@ void p2p::util::initProcessingFunctions() {
                                             [sourceAddress](const in_addr_t &addr) {
                                                 return sourceAddress == addr;
                                             }), nodesAddresses.end());
+        int lostDescriptors = 0;
         networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                                [sourceAddress](const FileDescriptor &fileDescriptor) {
+                                                [sourceAddress, &lostDescriptors](const FileDescriptor &fileDescriptor) {
+                                                    ++lostDescriptors;
                                                     return fileDescriptor.getHolderIp() == sourceAddress;
                                                 }));
-        BOOST_LOG_TRIVIAL(debug) << "<<< SHUTDOWN: node " << getFormatedIp(sourceAddress) << " have been closed";
+        BOOST_LOG_TRIVIAL(debug) << "<<< SHUTDOWN: node " << getFormatedIp(sourceAddress) << " have been closed"
+                                 << "; lost " << lostDescriptors << " descriptors";
     };
 
     // =================================================================================================================
@@ -213,6 +222,7 @@ void p2p::util::initProcessingFunctions() {
 
         // normal insert
         networkDescriptors.push_back(newFileDescriptor);
+        removeDuplicatesFromLists();
 
         BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
                                  << " md5: " << newFileDescriptor.getMd5().getHash()
@@ -299,6 +309,8 @@ void p2p::util::initProcessingFunctions() {
                 localDescriptor = updatedDescriptor;
             }
         }
+
+        removeDuplicatesFromLists();
     };
 
     // =================================================================================================================
