@@ -15,6 +15,9 @@ class Md5Hash {
 
 public:
 	Md5Hash() = default;
+	Md5Hash(const Md5Hash &other) {
+		strcpy(hash, other.hash);
+	}
 
 	explicit Md5Hash(const std::string &h) {
 		assert(h.size() == MD5_HASH_LENGTH);

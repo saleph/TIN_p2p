@@ -160,6 +160,11 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
 void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescriptors) {
     std::cout << std::endl;
     int i = 0;
+
+    std::sort(fileDescriptors.begin(), fileDescriptors.end(), [](const FileDescriptor &fd1, const FileDescriptor &fd2) {
+        return fd1.getName() < fd2.getName();
+    });
+
     for (auto &&fileDescriptor : fileDescriptors) {
         std::cout << ++i << ". "  << (fileDescriptor.isValid() ? " ": "#");
         std::cout << " name: " << fileDescriptor.getName();
