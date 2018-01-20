@@ -13,7 +13,7 @@ void UserInterface::start() {
     int canFinish = 1;
     do {
         try {
-            getline(std::cin, inputString);
+            std::getline(std::cin, inputString);
             canFinish = checkInput(inputString);
         }
         catch (std::invalid_argument &) {
@@ -151,7 +151,7 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
     std::stringstream ss(inputStream);
     std::string item;
     while (std::getline(ss, item, delim)) {
-        *((std::back_inserter(tokens))++) = item;
+        tokens.push_back(item);
     }
 
     return tokens;

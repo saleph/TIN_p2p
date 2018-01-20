@@ -15,16 +15,23 @@ class Md5Hash {
 
 public:
 	Md5Hash() = default;
+    Md5Hash(const Md5Hash &other) {
+		auto otherName = other.getHash();
+		std::copy(otherName.begin(), otherName.end(), hash);
+		hash[MD5_HASH_LENGTH] = 0;
+    }
 
 	explicit Md5Hash(const std::string &h) {
 		assert(h.size() == MD5_HASH_LENGTH);
-		strcpy(hash, h.c_str());
+		std::copy(h.begin(), h.end(), hash);
+		hash[MD5_HASH_LENGTH] = 0;
 	}
 
 	template <unsigned long size>
 	explicit Md5Hash(const std::array<char, size> &array) {
 		assert(strlen(array.data()) == MD5_HASH_LENGTH);
-		strcpy(hash, array.data());
+		std::copy(array.begin(), array.end(), hash);
+		hash[MD5_HASH_LENGTH] = 0;
 	}
 
 	std::string getHash() const {
@@ -32,12 +39,14 @@ public:
 	}
 
 	Md5Hash &operator=(const Md5Hash &other) {
-		strcpy(hash, other.hash);
+		auto otherName = other.getHash();
+		std::copy(otherName.begin(), otherName.end(), hash);
+		hash[MD5_HASH_LENGTH] = 0;
 		return *this;
 	}
 
 	bool operator==(const Md5Hash &other) const {
-		return !strcmp(hash, other.hash);
+		return getHash() == other.getHash();
 	}
 
     bool operator!=(const Md5Hash &other) const {

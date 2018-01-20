@@ -276,7 +276,7 @@ void p2p::util::storeFileContent(std::vector<uint8_t> &content, const std::strin
     storer.storeFile(content);
 }
 
-bool p2p::uploadFile(const std::string &name) {
+bool p2p::uploadFile(std::string name) {
     using namespace util;
     // create new descriptor (autofill MD5 and its size)
     FileDescriptor newDescriptor(name);
@@ -363,7 +363,7 @@ void p2p::util::uploadFile(FileDescriptor &descriptor) {
     tcpServer->sendData(buffer.data(), buffer.size(), holderNode);
 }
 
-bool p2p::getFile(const std::string &name) {
+bool p2p::getFile(std::string name) {
     using namespace util;
     FileDescriptor descriptor;
     {
@@ -396,7 +396,7 @@ bool p2p::getFile(const std::string &name) {
     return getFile(descriptor);
 }
 
-bool p2p::getFile(const std::string &name, const std::string &hash) {
+bool p2p::getFile(std::string name, std::string hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
@@ -452,7 +452,7 @@ void p2p::util::requestGetFile(FileDescriptor &descriptor) {
                              << " md5: " << descriptor.getMd5().getHash();
 }
 
-bool p2p::deleteFile(const std::string &name, const std::string &hash) {
+bool p2p::deleteFile(std::string name, std::string hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
@@ -473,7 +473,7 @@ bool p2p::deleteFile(const std::string &name, const std::string &hash) {
     return deleteFile(descriptor);
 }
 
-bool p2p::deleteFile(const std::string &name) {
+bool p2p::deleteFile(std::string name) {
     using namespace util;
     FileDescriptor descriptor;
     {
@@ -532,8 +532,8 @@ void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
 
     // prepare buffer
     std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
-    memcpy(buffer.data(), &message, sizeof(P2PMessage));
-    memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
+    memcpy(buffer.data(), (uint8_t *) &message, sizeof(P2PMessage));
+    memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t *) &descriptor, sizeof(FileDescriptor));
 
     // send request
     tcpServer->sendData(buffer.data(), buffer.size(), descriptor.getHolderIp());

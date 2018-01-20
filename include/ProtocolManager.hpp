@@ -21,36 +21,23 @@
 #include "FileDeleter.hpp"
 
 namespace p2p {
-    namespace util {
-        extern std::unordered_map<MessageType, std::function<void(const uint8_t *, uint32_t, in_addr_t)>> msgProcessors;
-        void initProcessingFunctions();
-
-        uint32_t getAverageNodesLoad();
-
-
-        uint32_t getThisNodeLoad();
-
-        void moveFilesWithSumaricSizeToNode(int64_t sourceAddress, in_addr_t i);
-
-    }
-
     const char *getFormatedIp(in_addr_t addr);
     void startSession();
     void endSession();
     std::vector<FileDescriptor> getLocalFileDescriptors();
     std::vector<FileDescriptor> getNetworkFileDescriptors();
-    bool uploadFile(const std::string &name);
-    bool getFile(const std::string &name);
-    bool getFile(const std::string &name, const std::string &hash);
-    bool deleteFile(const std::string &name);
-    bool deleteFile(const std::string &name, const std::string &hash);
-
+    bool uploadFile(std::string name);
+    bool getFile(std::string name);
+    bool getFile(std::string name, std::string hash);
+    bool deleteFile(std::string name);
+    bool deleteFile(std::string name, std::string hash);
 };
 
 
 // private members
 namespace p2p {
     namespace util {
+        extern std::unordered_map<MessageType, std::function<void(const uint8_t *, uint32_t, in_addr_t)>> msgProcessors;
         extern std::shared_ptr<TcpServer> tcpServer;
         extern std::shared_ptr<UdpServer> udpServer;
 
@@ -65,6 +52,10 @@ namespace p2p {
         extern std::thread timer;
         extern Mutex mutexIsStillNewNode;
 
+        void initProcessingFunctions();
+        uint32_t getAverageNodesLoad();
+        uint32_t getThisNodeLoad();
+        void moveFilesWithSumaricSizeToNode(int64_t sourceAddress, in_addr_t i);
         void processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
         void processTcpError(SocketOperation operation);
         void processUdpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
