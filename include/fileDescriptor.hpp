@@ -25,6 +25,8 @@ public:
 	explicit FileDescriptor() = default;
 	explicit FileDescriptor(const std::string& filename);
 
+	FileDescriptor(const FileDescriptor &other);
+
 	const Md5Hash& getMd5() const;
 	std::string getName() const;
 	uint32_t getSize() const;
@@ -43,7 +45,7 @@ public:
 
 private:
 	static uint32_t obtainFileSize(const char* fn);
-	void setName(const std::string& name);
+	void setName(std::string filename);
 
 	char name[MAX_FILENAME_LEN+1]{};
 	Md5Hash md5;
