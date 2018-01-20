@@ -502,6 +502,12 @@ bool p2p::deleteFile(std::string name) {
         descriptor = *descriptorPointer;
     }
 
+    if (!descriptor.isValid()) {
+        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
+                                << " is already being proceed (it's invalid now). Try again for a while.";
+        return false;
+    }
+
     return deleteFile(descriptor);
 }
 
