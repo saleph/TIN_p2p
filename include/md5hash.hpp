@@ -40,7 +40,7 @@ public:
 	}
 
 	bool operator==(const Md5Hash &other) const {
-		return !strcmp(hash, other.hash);
+		return getHash() == other.getHash();
 	}
 
     bool operator!=(const Md5Hash &other) const {
