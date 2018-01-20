@@ -109,14 +109,34 @@ Available commands:
 ```
 
 - `connect`/`disconnect` nawiązuje/kończy sesję P2P w sieci,
-- `upload` uploaduje plik do sieci (miejsce jego fizycznego składowania zostanie przydzielone automatycznie),
-- `delete` usuwa plik z sieci (ale tylko, jeśli wydającym komendę usunięcia jest jego właściciel),
-- `get` pobiera plik z sieci (samoczynnie odnajduje węzeł przechowujący),
+- `upload` uploaduje plik do sieci (miejsce jego fizycznego składowania zostanie przydzielone automatycznie). Można podać jednocześnie kilka plików (oddzielonych spacją),
+- `delete` usuwa plik z sieci (ale tylko, jeśli wydającym komendę usunięcia jest jego właściciel). Można podać jednocześnie kilka plików (oddzielonych spacją),
+- `get` pobiera plik z sieci (samoczynnie odnajduje węzeł przechowujący). Można podać jednocześnie kilka plików (oddzielonych spacją),
 - `saf` listuje pliki znajdujące się w sieci,
 - `slf` listuje pliki przechowywane w tym węźle.
 
 Wersje z dodatkowym hashem MD5 są konieczne tylko w przypadku, kiedy wybraliśmy plik, który posiada swoje odpowiedniki o tych samych nazwach (ale różnej zawartości!). W takim wypadku interfejs sam poprosi nas o użycie odpowiedniej komendy.
 Ścieżki do plików są rozwijane względem katalogu uruchomienia głównej binarki.
+
+## 7) Postać logów i plików konfiguracyjnych
+Projekt nie wymagał użycia dodatkowych plików konfiguracyjnych. Dopóki istnieje choć jeden węzeł, dopóty informacja o stanie całej sieci pozostaje kompletna. Aplikacja wykorzystuje bibliotekę logów `boost`, które przyjmują postać:
+
+```
+[2018-01-20 15:41:08.194663] [0x00007fcaf464d740] [debug]   >>> HELLO: joining to network
+[2018-01-20 15:41:08.196897] [0x00007fcaf1299700] [debug]   <<< HELLO_REPLY from: 192.168.0.102 0 descriptors received
+upload md5coll1 md5coll2
+[2018-01-20 15:42:44.910745] [0x00007fcaf464d740] [debug]   ===> UploadFile: md5coll1 saved in node 192.168.0.102
+[2018-01-20 15:42:44.913433] [0x00007fcaf464d740] [debug]   ===> UploadFile: md5coll2 saved in node 192.168.0.102
+[2018-01-20 15:42:44.915365] [0x00007fcaf1299700] [debug]   <<< NEW_FILE: md5coll1 md5: 6a5985f9058b4ab5b2a464004ca0f24e in node: 192.168.0.102
+[2018-01-20 15:42:44.919717] [0x00007fcaf1299700] [debug]   <<< NEW_FILE: hashes collision! md5coll1 and md5coll2 md5: 6a5985f9058b4ab5b2a464004ca0f24e upload times (old, new): 1516491764 vs 1516491764; earlier file choosen (or with < filename)
+```
+
+Naszym priorytetem było bardzo dokładne prowadzenie logów z pracy całego protokołu (bardzo uprościło to debugowanie). Każdy typ wiadomości (wyspecyfikowane w `MessageTypes`) posiada przynajmniej 1 własny log (a w przypadku bardziej złożonych nawet po 3-4 warianty - zależnie od aktualnego stanu rzeczy).
+
+Logi rozpoczynające się od:
+- `>>> [type]` oznaczają, że nadajemy wiadomość o takim `MessageType`,
+- `<<< [type]` oznaczają odebranie analogicznej wiadomości,
+- `===> [type]` oznaczają wysłanie żądania od użytkownika (jak upload, pobranie czy usunięcie pliku).
 
 ## 6) Zarys koncepcji implementacji
 Użyliśmy C++ (jako pomoc przy budowie CLI oraz obsługi przesyłanych struktur w stopniu podstawowym - np. modyfikacje strumenia, struktury `std::vector` jako bufory) wraz z częścią biblioteki `BOOST` - do przeprowadzania unit-testów oraz zbierania logów. Do obsługi współbieżności zostaną użyte POSIXowe `pthreads`, a do obsługi sieci - gniazda BSD.
