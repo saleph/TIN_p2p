@@ -39,6 +39,7 @@ void p2p::util::initProcessingFunctions() {
         // estimate new average node load
         uint32_t averageNodesLoad = getAverageNodesLoad();
         uint32_t thisNodeLoad = getThisNodeLoad();
+        // if this node is storing more than average - move excess number of bytes (rounding to file sizes)
         int64_t sizeToMoveFromThisNode = thisNodeLoad - averageNodesLoad;
 
         BOOST_LOG_TRIVIAL(debug) << "size to move from this node: " << sizeToMoveFromThisNode;
