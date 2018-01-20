@@ -56,22 +56,7 @@ void p2p::util::initProcessingFunctions() {
     // =================================================================================================================
     // replay for other nodes
     msgProcessors[MessageType::HELLO_REPLY] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        { // check if this node is already older node
-            Guard guard(mutexIsStillNewNode);
-            if (!isStillNewNode) {
-                // we are adult node and we have all descriptors
-                BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY: hello reply received as adult node - do nothing";
-                return;
-            } else {
-                // remove duplicates if present
-                removeDuplicatesFromLists();
-            }
-        }
-
-        if (sourceAddress == udpServer->getLocalhostIp()) {
-            // our broadcast, skip
-            return;
-        }
+        removeDuplicatesFromLists();
         BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY from: " << getFormatedIp(sourceAddress) << " "
                                  << size / sizeof(FileDescriptor) << " descriptors received";
 
