@@ -9,9 +9,9 @@
   <element>
     <id>UMLSequenceAllInOne</id>
     <coordinates>
-      <x>10</x>
-      <y>900</y>
-      <w>810</w>
+      <x>290</x>
+      <y>1630</y>
+      <w>850</w>
       <h>370</h>
     </coordinates>
     <panel_attributes>title=Upload file
@@ -38,9 +38,9 @@ tick=</panel_attributes>
   <element>
     <id>UMLSequenceAllInOne</id>
     <coordinates>
-      <x>10</x>
+      <x>230</x>
       <y>0</y>
-      <w>940</w>
+      <w>980</w>
       <h>890</h>
     </coordinates>
     <panel_attributes>title=Joining to network
@@ -96,9 +96,9 @@ a-&gt;net :updateDescriptor(FILE3)
   <element>
     <id>UMLSequenceAllInOne</id>
     <coordinates>
-      <x>10</x>
-      <y>1280</y>
-      <w>790</w>
+      <x>290</x>
+      <y>2010</y>
+      <w>840</w>
       <h>370</h>
     </coordinates>
     <panel_attributes>title=Delete file
@@ -125,10 +125,10 @@ tick=</panel_attributes>
   <element>
     <id>UMLSequenceAllInOne</id>
     <coordinates>
-      <x>10</x>
-      <y>1660</y>
-      <w>750</w>
-      <h>440</h>
+      <x>300</x>
+      <y>2390</y>
+      <w>820</w>
+      <h>450</h>
     </coordinates>
     <panel_attributes>title=Get file
 autoTick=false
@@ -152,6 +152,50 @@ tick=
 n1-&gt;a: sendFile(FILE2)
 a.&gt;&gt;&gt;user
 tick=</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLSequenceAllInOne</id>
+    <coordinates>
+      <x>230</x>
+      <y>900</y>
+      <w>980</w>
+      <h>720</h>
+    </coordinates>
+    <panel_attributes>title=Disconnect from network
+autoTick=false
+obj=User~user ACTOR 
+obj=Local node~a EXECUTION
+obj=Broadcast~net
+obj=Other nodes~n2 EXECUTION
+
+user-&gt;&gt;&gt;a: endSession();
+tick=
+a-&gt;net :DISCONNECTING
+tick=
+combinedFragment=foreach~loopid net n2
+		net-&gt;n2 :DISCONNECTING
+		tick=
+		n2-&gt;n2+ :discard\nnode
+		tick=
+	--=loopid
+tick=
+combinedFragment=for every local descriptor~loopid a n2
+		a-&gt;a+ :choose\nnew\nholder\nnode
+		tick=
+		tick=
+		a-&gt;net :discardDescriptor
+		tick=
+		a-&gt;n2 :changeHolderNode
+		tick=
+		n2-&gt;net :updateDescriptor
+	--=loopid
+tick=
+tick=
+a-&gt;net :SHUTDOWN
+tick=
+a.&gt;&gt;&gt;user
+off=a</panel_attributes>
     <additional_attributes/>
   </element>
 </diagram>
