@@ -3,7 +3,7 @@
 #include <FileLoader.hpp>
 #include <signal.h>
 
-UserInterface::UserInterface() {}
+UserInterface::UserInterface() = default;
 
 void UserInterface::start() {
     std::cout << "TIN p2p" << std::endl;
@@ -159,11 +159,13 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
 
 void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescriptors) {
     std::cout << std::endl;
-    for (int i = 0; i < fileDescriptors.size(); i++) {
-        std::cout << "name: " << fileDescriptors[i].getName();
-        std::cout << " md5: " << fileDescriptors[i].getMd5().getHash();
-        std::cout << " owner: " << p2p::getFormatedIp(fileDescriptors[i].getOwnerIp());
-        std::cout << " holder: " << p2p::getFormatedIp(fileDescriptors[i].getHolderIp());
+    for (auto &&fileDescriptor : fileDescriptors) {
+        std::cout << (fileDescriptor.isValid() ? " ": "#");
+        std::cout << " name: " << fileDescriptor.getName();
+        std::cout << "\tmd5: " << fileDescriptor.getMd5().getHash();
+        std::cout << "\towner: " << p2p::getFormatedIp(fileDescriptor.getOwnerIp());
+        std::cout << "\tholder: " << p2p::getFormatedIp(fileDescriptor.getHolderIp());
+        std::cout << "\tsize: " << fileDescriptor.getSize();
         std::cout << std::endl;
     }
     std::cout << std::endl;
@@ -171,18 +173,19 @@ void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescript
 
 
 void UserInterface::help() {
+    int i = 0;
     std::cout << std::endl;
     std::cout << "Available commands:" << std::endl;
-    std::cout << "connect" << std::endl;
-    std::cout << "disconnect" << std::endl;
-    std::cout << "upload <filenames>" << std::endl;
-    std::cout << "delete <filenames>" << std::endl;
-    std::cout << "deletemd5 <filenames> <md5>" << std::endl;
-    std::cout << "get <filenames>" << std::endl;
-    std::cout << "getmd5 <filenames> <md5>" << std::endl;
-    std::cout << "saf (show all files in network)" << std::endl;
-    std::cout << "slf (show local files)" << std::endl;
-    std::cout << "help" << std::endl;
+    std::cout << ++i << ". " << "connect" << std::endl;
+    std::cout << ++i << ". " << "disconnect" << std::endl;
+    std::cout << ++i << ". " << "upload <filenames>" << std::endl;
+    std::cout << ++i << ". " << "delete <filenames>" << std::endl;
+    std::cout << ++i << ". " << "deletemd5 <filenames> <md5>" << std::endl;
+    std::cout << ++i << ". " << "get <filenames>" << std::endl;
+    std::cout << ++i << ". " << "getmd5 <filenames> <md5>" << std::endl;
+    std::cout << ++i << ". " << "saf (show all files in network)" << std::endl;
+    std::cout << ++i << ". " << "slf (show local files)" << std::endl;
+    std::cout << ++i << ". " << "help" << std::endl;
     std::cout << std::endl;
 };
 

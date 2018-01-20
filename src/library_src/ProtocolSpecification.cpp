@@ -170,15 +170,33 @@ void p2p::util::initProcessingFunctions() {
         // check collisions
         Guard guard(mutex);
         if (!isDescriptorUnique(newFileDescriptor)) {
+            // get descriptor with the same md5
             FileDescriptor repetedDescriptor = getRepetedDescriptor(newFileDescriptor);
 
-            BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: hashes collision! md5: "
-                                     << repetedDescriptor.getMd5().getHash()
+            BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: hashes collision! "
+                                     << repetedDescriptor.getName() << " and " << newFileDescriptor.getName()
+                                     << " md5: " << repetedDescriptor.getMd5().getHash()
                                      << " upload times (old, new): "
                                      << repetedDescriptor.getUploadTime() << " vs "
                                      << newFileDescriptor.getUploadTime()
-                                     << "; earlier file choosen";
+                                     << "; earlier file choosen (or with < filename)";
 
+            // if system_clock can't distinguish version between collisions based on time
+            if (repetedDescriptor.getUploadTime() == newFileDescriptor.getUploadTime()) {
+                // if new file has "lower" name
+                if (newFileDescriptor.getName() < repetedDescriptor.getName()) {
+                    // remove old descriptor
+                    networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                                            [&repetedDescriptor](const FileDescriptor &fd) {
+                                                                return fd.getMd5() == repetedDescriptor.getMd5();
+                                                            }));
+                    networkDescriptors.push_back(newFileDescriptor);
+                }
+                // if already present file has lower name - do nothing
+                return;
+            }
+
+            // if new desriptor is earlier version - choose it
             if (repetedDescriptor.getUploadTime() > newFileDescriptor.getUploadTime()) {
                 networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
                                                         [&repetedDescriptor](const FileDescriptor &fd) {
@@ -245,6 +263,12 @@ void p2p::util::initProcessingFunctions() {
         for (auto &&networkDescriptor : networkDescriptors) {
             if (networkDescriptor.getMd5() == updatedDescriptor.getMd5()) {
                 networkDescriptor = updatedDescriptor;
+            }
+        }
+        // update particular descriptor
+        for (auto &&localDescriptor : localDescriptors) {
+            if (localDescriptor.getMd5() == updatedDescriptor.getMd5()) {
+                localDescriptor = updatedDescriptor;
             }
         }
     };
