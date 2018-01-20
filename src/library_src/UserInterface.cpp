@@ -159,8 +159,9 @@ std::vector<std::string> UserInterface::split(const std::string &inputStream, ch
 
 void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescriptors) {
     std::cout << std::endl;
+    int i = 0;
     for (auto &&fileDescriptor : fileDescriptors) {
-        std::cout << (fileDescriptor.isValid() ? " ": "#");
+        std::cout << ++i << ". "  << (fileDescriptor.isValid() ? " ": "#");
         std::cout << " name: " << fileDescriptor.getName();
         std::cout << "\tmd5: " << fileDescriptor.getMd5().getHash();
         std::cout << "\towner: " << p2p::getFormatedIp(fileDescriptor.getOwnerIp());

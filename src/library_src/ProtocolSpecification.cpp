@@ -247,13 +247,21 @@ void p2p::util::initProcessingFunctions() {
         BOOST_LOG_TRIVIAL(debug) << "<<< DISCARD_DESCRIPTOR: " << descriptor.getName()
                                  << " md5: " << descriptor.getMd5().getHash()
                                  << " from " << getFormatedIp(sourceAddress);
+        descriptor.makeUnvalid();
 
         Guard guard(mutex);
+        bool descriptorPresence = false;
         // make this descriptor no longer valid
         for (auto &&networkDescriptor : networkDescriptors) {
             if (networkDescriptor.getMd5() == descriptor.getMd5()) {
                 networkDescriptor.makeUnvalid();
+                descriptorPresence = true;
             }
+        }
+        // check if this descriptor has been lost in some broadcast
+        if (!descriptorPresence) {
+            // that's mean this descriptor has not been received
+            networkDescriptors.push_back(descriptor);
         }
         for (auto &&localDescriptor : localDescriptors) {
             if (localDescriptor.getMd5() == descriptor.getMd5()) {
@@ -272,11 +280,18 @@ void p2p::util::initProcessingFunctions() {
                                  << " from " << getFormatedIp(sourceAddress);
 
         Guard guard(mutex);
+        bool descriptorPresence = false;
         // update particular descriptor
         for (auto &&networkDescriptor : networkDescriptors) {
             if (networkDescriptor.getMd5() == updatedDescriptor.getMd5()) {
                 networkDescriptor = updatedDescriptor;
+                descriptorPresence = true;
             }
+        }
+        // check if this descriptor has been lost in some broadcast
+        if (!descriptorPresence) {
+            // that's mean this descriptor has not been received
+            networkDescriptors.push_back(updatedDescriptor);
         }
         // update particular descriptor
         for (auto &&localDescriptor : localDescriptors) {
