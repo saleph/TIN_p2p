@@ -48,7 +48,7 @@ void p2p::startSession() {
     // what is not what we want for older nodes
     using namespace util;
     timer = std::thread([&isStillNewNode, &mutexIsStillNewNode, NEW_NODE_STATE_DURATION_MS]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(NEW_NODE_STATE_DURATION_MS));
+        usleep(NEW_NODE_STATE_DURATION_MS * 1000);
         Guard guard(util::mutexIsStillNewNode);
         isStillNewNode = false;
     });
@@ -627,7 +627,7 @@ uint32_t p2p::util::getAverageNodesLoad() {
         sum += nodeLoad.second;
     }
 
-    return sum / (uint32_t)nodesLoad.size();
+    return sum / (uint32_t) nodesLoad.size();
 }
 
 uint32_t p2p::util::getThisNodeLoad() {
@@ -646,7 +646,7 @@ void p2p::util::moveFilesWithSumaricSizeToNode(int64_t sizeToMove, in_addr_t sou
 
     // iterate over local descriptor
     for (auto it = localDescriptors.begin(); it != localDescriptors.end() && sizeToMove > 0;) {
-        if (it->getSize() <= sizeToMove)  {
+        if (it->getSize() <= sizeToMove) {
             sizeToMove -= it->getSize();
             // do "HOLDER_CHANGE"
             changeHolderNode(*it, sourceAddress);

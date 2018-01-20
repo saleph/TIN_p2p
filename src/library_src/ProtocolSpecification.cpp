@@ -16,7 +16,8 @@ void p2p::util::initProcessingFunctions() {
         P2PMessage message = {};
         message.setMessageType(MessageType::HELLO_REPLY);
         unsigned long additionalDataSize = localDescriptors.size() * sizeof(FileDescriptor);
-        message.setAdditionalDataSize(additionalDataSize);
+        message.setAdditionalDataSize
+                (additionalDataSize);
 
         // create a vector with size of the whole message (empty)
         std::vector<uint8_t> buffer(additionalDataSize + sizeof(P2PMessage));
@@ -37,6 +38,8 @@ void p2p::util::initProcessingFunctions() {
         uint32_t averageNodesLoad = getAverageNodesLoad();
         uint32_t thisNodeLoad = getThisNodeLoad();
         int64_t sizeToMoveFromThisNode = thisNodeLoad - averageNodesLoad;
+
+        BOOST_LOG_TRIVIAL(debug) << "size to move from this node: " << sizeToMoveFromThisNode;
 
         if (sizeToMoveFromThisNode < 0) {
             // nothing to send from this node
