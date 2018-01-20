@@ -4,11 +4,20 @@
 - Plik jest identyfikowany nazwą oraz hashem (MD5), jednak sam hash nie jest wykorzystywany do innego celu niż identyfikacja pliku (mapowanie h >> n jest nie do końca intuicyjne, bo: adresy IP mogą być nieciągłe oraz mogą zostawiać dowolne, nieprzewidziane odległości między sobą w przypadku odłączania węzłów). Informacja o węźle przetrzymującym plik będzie zawarta w deskryptorze pliku. Jego głównym wyróżnikiem jest hash MD5 - dopóki hashe są różne - pliki mogą mieć takie same nazwy.
 
 ## 3) Krótki opis funkcjonalny
+### Dystrybucja zasobów
 - Węzęł dołączający się do sieci wysyła jedynie informację o swoim pojawieniu się poprzez Broadcast - pozostałe węzły sieci wysyłają	 informacje o plikach, które u siebie przechowują poprzez bezpośrednie połączenie z nowym węzłem. Po tym dopiero następuje redestrybucja zasobów (przesłanie części własnych plików do nowego węzła).
 - Węzeł dystrybuujący swój zasób oznacza go jako tymczasowo nieważny i rozsyła tę informację do wszystkich węzłów sieci. Po tym wykonuje transmisję oznaczonego zasobu do węzła przyjmującego pliki, który dopiero po prawidłowym odebraniu pliku - rozgłasza nowy deskryptor pliku (ze zmienionym węzłem przechowującym), już z flagą aktualności.
+- Węzły przechowują zasoby w plikach o nazwach równym ich hashowi MD5 (umożliwia to przechowywanie przez jeden węzeł 2 deskryptorów o tej samej nazwie).
+
+### Strategia dystrybucji
 - Miejsce składowania nowego pliku jest wybierane przed jego pojawieniem się w sieci na podstawie obciążenia węzłów (po sumarycznym rozmiarze przechowywanych plików). Po poprawnej transmisji (jeśli taka była potrzebna - sytuacja, że wybrany węzeł przechowujący != właściciela) węzeł, który odebrał plik rozgłasza jego pojawienie się w sieci.
+- Po dołączeniu się nowego węzła następuje rebalansowanie sieci. Jeśli jakiś węzeł przechowuje u siebie więcej zasobów niż oczekiwana średnia - przesyła tę nadwyżkę (zaokrąglając do całych plików) do nowego węzła.
+
+### Realizacja interfejsu węzła
 - Usunięcie pliku z sieci (unieważnienie przez właściciela) opiera się na wysłaniu bezpośredniego żądania usunięcia pliku do węzła, który ten plik aktualnie przechowuje. Oznacza on ten plik jako "usunięty" i rozsyła tę informację po całej sieci. Wtedy każdy z węzłów jest zobligowany do usunięcia deskryptora danego pliku ze swojej listy. Jeśli trwają jeszcze jakieś transmisje - węzeł wysyłający żądanie usunięcia pliku na to nie pozwoli.
 - Poprawne odłączenie się węzła opiera się na: rozgłoszeniu informacji w sieci o rozpoczęciu procedury odłączenia (zapobiegnie to sytuacji, kiedy w momencie "opróżniania" węzła powstaną nowe pliki, które zostałyby do niego przesłane), oznaczenia wszystkich przechowywanych zasobów jako "tymczasowo nieważnych" oraz ich redestrybucji do pozostałych węzłów sieci (które po odebraniu zasobów ponownie rozgłoszą ich aktualne deskryptory). Po zakończeniu tych operacji węzeł wysyła ostatni broadcast "SHUTDOWN", który ostatecznie sygnalizuje, że węzeł przestał istnieć.
+
+### Sytuacje wyjątkowe
 - Zaniknięcie węzła - w przypadku, jeśli węzeł zakończył pracę nieprawidłowo, to przy pierwszej próbie połączenia przez którykolwiek z węzłów informacja o tym zostanie rozgłoszona po sieci - wtedy każdy z węzłów usunie z własnej listy deskryptorów te wpisy, których zasoby które znajdowały się na usuniętym węźle. Wszystkie ewentualne transmisje zwrócą błędy, a jeśli będzie to możliwe - odwrócą jak najwięcej szkód. Pliki, których właścicielem był utracony węzeł nie zostają usunięte (jeśli komunikacja z węzłem zostanie ponowiona - zasoby dalej będą dostępne).
 - Konflikt nazw - nie występuje. Jeśli taka sytuacja nastąpi, to CLI wyświetli oba pliki wraz z fragmentem ich hasha i poprosi o wprowadzenie komendy rozszerzonej (nazwa + hash pliku).
 - Konflikt hashy - przypadek, kiedy ten sam plik został zuploadowany przed propagacją informacji o poprzednio dodanym pliku. Wtedy każdy z węzłów automatycznie usuwa deskryptor pliku, który miał późniejszy "uploadTime". Jeśli czasy uploadu są takie same - wybranie zostanie deskryptor z nazwą leksykograficznie mniejszą (zawartość plików jest wtedy taka sama, więc w żaden sposób nie tracimy wtedy żadnej informacji).
@@ -33,7 +42,7 @@ enum class MessageType {
 	DISCONNECTING,		// UDP powiadomienie sieci o rozpoczęciu odłączania się
 	CONNECTION_LOST,	// UDP powiadomienie sieci o utraceniu węzła o określonym IP (podanym w sekcji danych)
 	CMD_REFUSED,		// TCP powiadomienie węzła, który złożył żądanie (np. o pobranie pliku) o braku możliwości wykonania transkacji (np. dostęp do pliku oznaczonego jako "tymczasowo nieważny" albo próba przesłania pliku do węzła w stanie "disconnecting")
-   	SHUTDOWN,           	//< UDP ostatnia wiadomość wysyłana przez zamykający się węzeł - ostatecznie usuwa wszystkie deskryptory, ktore nadal nie zostaly zaktualizowane
+   	SHUTDOWN,           	// UDP ostatnia wiadomość wysyłana przez zamykający się węzeł - ostatecznie usuwa wszystkie deskryptory, ktore nadal nie zostaly zaktualizowane
 	
 	// zarządzanie plikami
 	NEW_FILE,		// UDP powiadomienie sieci o nowym pliku o danym deskryptorze (podanym w sekcji danych)
@@ -66,7 +75,8 @@ struct FileDescriptor {
 
 ### Zależności czasowe
 
-![diagram sekwencji](https://github.com/saleph/TIN_p2p/blob/master/docs/sequencediagrams.png "Diagram sekwencji")
+![diagram sekwencji](docs/apidiagrams.png "Diagram sekwencji")
+![diagram sekwencji](docs/join_disconnect.png "Diagram sekwencji")
 
 ## 5) Moduły i realizacja współbieżności
 ### Moduły
