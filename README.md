@@ -179,3 +179,12 @@ Od czasu do czasu udawało się nam również doprowadzać do skrajnego hazardu 
 Jednak ten przypadek był jeszcze bardziej złośliwy - nawet czasy uploadu były jednakowe. Błędem byłoby wzięcie dowolnego z pary skonfliktowanych deskryptorów - wtedy wiele węzłów mogłoby mieć ten sam fizycznie plik przechowywany pod różnymi nazwami (co po chwili doprowadziłoby do zduplikowania tego deskryptora przy dowolnej próbie przeniesienia czy uaktualnienia tego zasobu) - co też się na początku wydarzyło. 
 
 Przyjęliśmy, że zawsze wybierzemy wtedy nazwę leksykograficznie mniejszą. Dzięki temu nie zachodziły kolejne niejednoznaczności w sieci.
+
+#### Awaria węzła
+Zgodnie z opisem wstępnym każda awaria węzła jest traktowana jako awaryjne odłączenie węzła od sieci (w połączeniu z uznaniem plików, które przechowywał, jako utracone).
+
+Rozpatrzyliśmy też sytuację "miękkiej" awarii - czyli utraceniu jedynie połączenia do sieci. Wtedy węzeł pozostaje w stanie, w którym znalazł się przez awarią. Przy pierwszej próby dostępu do tego węzła nastąpi powiadomienie sieci o utracie kontaktu z tym węzłem.
+
+Po ponownym podłączeniu węzeł najpierw biernie nasłuchiwał broadcastów ze zmieniającymi się stanami plików. Po chwili byliśmy w stanie zażądać już jakiegoś zasobu z innego węzła (przez dynamiczne odbudowywanie sieci).
+
+Zaś po kontrolowanym wykonaniu zamknięcia (przez `endSession()`) udało nam się wyrzucić pliki przechowywane w tym węźle do innych, istniejących już wcześniej. Dzięki temu udało się nam odzyskać zasoby przechowywane w tym węźle (zostały przerzucone do starych węzłów, a potem na nowo opublikowane w sieci).
