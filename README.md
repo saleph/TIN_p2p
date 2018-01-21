@@ -174,6 +174,8 @@ W takiej konfiguracji czasami występowały już problemy w dostarczaniu broadca
 Ich skutkiem była zdesynchronizowana baza deskryptorów sieciowych. Jednak nie powodowała ona całkowitego zniszczenia sieci (jeśli np. próbowalibyśmy się dostać do zasobu nieaktualnego, to węzeł odbiorczy sam odmówił przeprowadzenia transakcji - komenda CMD_REFUSED).
 
 #### Hazardy wersji deskryptorów
-Od czasu do czasu udawało się nam również doprowadzać do skrajnego hazardu deskryptorów (log z tej sytuacji w punkcie **7)**) - kiedy 2 pliki o różnej nazwie mają ten sam hash MD5 i nie zostało to wychwycone przez funkcję `uploadFile()`. Przystępujemy wtedy do odrzucenia deskryptora utworzonego później. 
+Od czasu do czasu udawało się nam również doprowadzać do skrajnego hazardu deskryptorów (log z tej sytuacji w punkcie **7) Postać logów i plików konfiguracyjnych**) - kiedy 2 pliki o różnej nazwie mają ten sam hash MD5 i nie zostało to wychwycone przez funkcję `uploadFile()`. Przystępujemy wtedy do odrzucenia deskryptora utworzonego później. 
 
-Jednak ten przypadek był jeszcze bardziej złośliwy - nawet czasy uploadu były jednakowe. Błędem byłoby wzięcie dowolnego z pary skonfliktowanych deskryptorów - wtedy wiele węzłów mogłoby mieć ten sam fizycznie plik przechowywany pod różnymi nazwami (co po chwili doprowadziłoby do zduplikowania tego deskryptora przy dowolnej próbie przeniesienia czy uaktualnienia tego zasobu). Przyjęliśmy, że zawsze wybierzemy wtedy nazwę leksykograficznie mniejszą. Dzięki temu nie zachodziły kolejne niejednoznaczności w sieci.
+Jednak ten przypadek był jeszcze bardziej złośliwy - nawet czasy uploadu były jednakowe. Błędem byłoby wzięcie dowolnego z pary skonfliktowanych deskryptorów - wtedy wiele węzłów mogłoby mieć ten sam fizycznie plik przechowywany pod różnymi nazwami (co po chwili doprowadziłoby do zduplikowania tego deskryptora przy dowolnej próbie przeniesienia czy uaktualnienia tego zasobu) - co też się na początku wydarzyło. 
+
+Przyjęliśmy, że zawsze wybierzemy wtedy nazwę leksykograficznie mniejszą. Dzięki temu nie zachodziły kolejne niejednoznaczności w sieci.
