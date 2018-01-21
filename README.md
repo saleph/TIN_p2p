@@ -92,7 +92,10 @@ Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje oso
 
 ![współbieżność](https://github.com/saleph/TIN_p2p/blob/master/docs/concurrencydiagram.png "Realizacja współbieżności")
 
-## 6) Interfejs użytkownika
+## 6) Serwery TCP i UDP
+Serwery TCP i UDP stosują strategię jeden wątek na każde połączenie. Zarządzają one pulą wątków obsługujących aktywne połączenia, do której wątek zostaje dopisany przy stworzeniu nowego połączenia i wypisany przy zakończeniu obsługi. Kiedy węzeł odłącza się od sieci, serwery zamykają gniazda nasłuchujące na nowe połączenia i czekają aż pula wątków aktywnych połączeń zostanie opróżniona, co pozwala na poprawne zakończenie transmisji.
+
+## 7) Interfejs użytkownika
 Interfejs użytkownika implementuje podstawowe akcje do wykonania w stosunku do sieci.
 ```
 Available commands:
@@ -118,7 +121,7 @@ Available commands:
 Wersje z dodatkowym hashem MD5 są konieczne tylko w przypadku, kiedy wybraliśmy plik, który posiada swoje odpowiedniki o tych samych nazwach (ale różnej zawartości!). W takim wypadku interfejs sam poprosi nas o użycie odpowiedniej komendy.
 Ścieżki do plików są rozwijane względem katalogu uruchomienia głównej binarki.
 
-## 7) Postać logów i plików konfiguracyjnych
+## 8) Postać logów i plików konfiguracyjnych
 Projekt nie wymagał użycia dodatkowych plików konfiguracyjnych. Dopóki istnieje choć jeden węzeł, dopóty informacja o stanie całej sieci pozostaje kompletna. Aplikacja wykorzystuje bibliotekę logów `boost`, które przyjmują postać:
 
 ```
@@ -138,7 +141,7 @@ Logi rozpoczynające się od:
 - `<<< [type]` oznaczają odebranie analogicznej wiadomości,
 - `===> [type]` oznaczają wysłanie żądania od użytkownika (jak upload, pobranie czy usunięcie pliku).
 
-## 8) Opis wykorzystanych narzędzi
+## 9) Opis wykorzystanych narzędzi
 Użyliśmy:
 - `C++14`: obsługa przesyłanych komunikatów (np. `<vector>` używane w postaci buforów), sprytne wskaźniki (opóźnione instancjonowanie serwerów TCP i UDP) oraz w strukturze procesorów wiadomości (`<functional>`):
 ```c++
@@ -156,7 +159,7 @@ msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_ad
 - `boost`: unit-testy, zbierania logów. 
 - `POSIX`: obsługa współbieżności (threads, mutexes), a do obsługi sieci - gniazda BSD.
 
-## 9) Opis testów i ich wyników
+## 10) Opis testów i ich wyników
 Testowaliśmy aplikację na 2 sposoby.
 
 ### Unit testy
