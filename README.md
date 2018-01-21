@@ -155,3 +155,25 @@ msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_ad
 ```
 - `boost`: unit-testy, zbierania logów. 
 - `POSIX`: obsługa współbieżności (threads, mutexes), a do obsługi sieci - gniazda BSD.
+
+## 9) Opis testów i ich wyników
+Testowaliśmy aplikację na 2 sposoby.
+
+### Unit testy
+Dla fragmentów, które na to pozwalały (takie jak np. wyliczanie hasha MD5, obsługa serwerów TCP i UDP, testowanie klas pomocniczych zarządzania plikami etc.) przeprowadzaliśmy wiele testów jednostkowych, co efektywnie przyśpieszyło rozwój samej implementacji protokołu (mając pewność co do poprawności używanych modułów aplikacji).
+
+### Testy protokołu
+Zestawiliśmy ze sobą kilka maszyn wirtualnych połączonych bezpośrednim mostkiem do interfejsu sieciowego. Na docelowej konfiguracji testy przeprowadzane były na:
+
+- PC1: 4 maszyny wirtualne z Ubuntu 16.04 (PC podłączony po WiFi do sieci lokalnej)
+- PC2: 1 maszyna wirtualna z Ubuntu 16.04 (PC podłączony przez Ethernet)
+	
+#### Broadcasty UDP
+W takiej konfiguracji czasami występowały już problemy w dostarczaniu broadcastów do wszystkich węzłów. Sieć w wielu miejscach stara się odbudowywać w miarę możliwości utracone informacje (każda zmiana stanu jakiegoś deskryptora jest kolejną szansą na jego dotarcie do wszystkich węzłów). 
+
+Ich skutkiem była zdesynchronizowana baza deskryptorów sieciowych. Jednak nie powodowała ona całkowitego zniszczenia sieci (jeśli np. próbowalibyśmy się dostać do zasobu nieaktualnego, to węzeł odbiorczy sam odmówił przeprowadzenia transakcji - komenda CMD_REFUSED).
+
+#### Hazardy wersji deskryptorów
+Od czasu do czasu udawało się nam również doprowadzać do skrajnego hazardu deskryptorów (log z tej sytuacji w punkcie **7)**) - kiedy 2 pliki o różnej nazwie mają ten sam hash MD5 i nie zostało to wychwycone przez funkcję `uploadFile()`. Przystępujemy wtedy do odrzucenia deskryptora utworzonego później. 
+
+Jednak ten przypadek był jeszcze bardziej złośliwy - nawet czasy uploadu były jednakowe. Błędem byłoby wzięcie dowolnego z pary skonfliktowanych deskryptorów - wtedy wiele węzłów mogłoby mieć ten sam fizycznie plik przechowywany pod różnymi nazwami (co po chwili doprowadziłoby do zduplikowania tego deskryptora przy dowolnej próbie przeniesienia czy uaktualnienia tego zasobu). Przyjęliśmy, że zawsze wybierzemy wtedy nazwę leksykograficznie mniejszą. Dzięki temu nie zachodziły kolejne niejednoznaczności w sieci.
