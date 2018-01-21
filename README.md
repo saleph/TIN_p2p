@@ -138,5 +138,20 @@ Logi rozpoczynające się od:
 - `<<< [type]` oznaczają odebranie analogicznej wiadomości,
 - `===> [type]` oznaczają wysłanie żądania od użytkownika (jak upload, pobranie czy usunięcie pliku).
 
-## 6) Zarys koncepcji implementacji
-Użyliśmy C++ (jako pomoc przy budowie CLI oraz obsługi przesyłanych struktur w stopniu podstawowym - np. modyfikacje strumenia, struktury `std::vector` jako bufory) wraz z częścią biblioteki `BOOST` - do przeprowadzania unit-testów oraz zbierania logów. Do obsługi współbieżności zostaną użyte POSIXowe `pthreads`, a do obsługi sieci - gniazda BSD.
+## 8) Opis wykorzystanych narzędzi
+Użyliśmy:
+- `C++14`: obsługa przesyłanych komunikatów (np. `<vector>` używane w postaci buforów), sprytne wskaźniki (opóźnione instancjonowanie serwerów TCP i UDP) oraz w strukturze procesorów wiadomości (`<functional>`):
+```c++
+void p2p::util::processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation) {
+    P2PMessage &p2pMessage = *(P2PMessage *) data;
+    [...]
+    
+    msgProcessors.at(messageType)(additionalData, additionalDataSize, operation.connectionAddr);
+}
+
+msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
+   // process HELLO broadcast received in this node
+}
+```
+- `boost`: unit-testy, zbierania logów. 
+- `POSIX`: obsługa współbieżności (threads, mutexes), a do obsługi sieci - gniazda BSD.
