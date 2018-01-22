@@ -130,6 +130,7 @@ void p2p::util::sendShutdown() {
     P2PMessage message{};
     message.setMessageType(MessageType::SHUTDOWN);
     message.setAdditionalDataSize(0);
+    BOOST_LOG_TRIVIAL(debug) << ">>> SHUTDOWN: node is closing";
 
     udpServer->broadcast((uint8_t *) &message, sizeof(P2PMessage));
 }

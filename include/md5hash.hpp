@@ -22,14 +22,12 @@ public:
     }
 
 	explicit Md5Hash(const std::string &h) {
-		assert(h.size() == MD5_HASH_LENGTH);
 		std::copy(h.begin(), h.end(), hash);
 		hash[MD5_HASH_LENGTH] = 0;
 	}
 
 	template <unsigned long size>
 	explicit Md5Hash(const std::array<char, size> &array) {
-		assert(strlen(array.data()) == MD5_HASH_LENGTH);
 		std::copy(array.begin(), array.end(), hash);
 		hash[MD5_HASH_LENGTH] = 0;
 	}
