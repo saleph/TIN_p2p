@@ -92,7 +92,10 @@ Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje oso
 
 ![współbieżność](https://github.com/saleph/TIN_p2p/blob/master/docs/concurrencydiagram.png "Realizacja współbieżności")
 
-## 6) Interfejs użytkownika
+## 6) Serwery TCP i UDP
+Serwery TCP i UDP stosują strategię jeden wątek na każde połączenie. Zarządzają one pulą wątków obsługujących aktywne połączenia, do której wątek zostaje dopisany przy stworzeniu nowego połączenia i wypisany przy zakończeniu obsługi. Kiedy węzeł odłącza się od sieci, serwery zamykają gniazda nasłuchujące na nowe połączenia i czekają aż pula wątków aktywnych połączeń zostanie opróżniona, co pozwala na poprawne zakończenie transmisji.
+
+## 7) Interfejs użytkownika
 Interfejs użytkownika implementuje podstawowe akcje do wykonania w stosunku do sieci.
 ```
 Available commands:
@@ -118,7 +121,7 @@ Available commands:
 Wersje z dodatkowym hashem MD5 są konieczne tylko w przypadku, kiedy wybraliśmy plik, który posiada swoje odpowiedniki o tych samych nazwach (ale różnej zawartości!). W takim wypadku interfejs sam poprosi nas o użycie odpowiedniej komendy.
 Ścieżki do plików są rozwijane względem katalogu uruchomienia głównej binarki.
 
-## 7) Postać logów i plików konfiguracyjnych
+## 8) Postać logów i plików konfiguracyjnych
 Projekt nie wymagał użycia dodatkowych plików konfiguracyjnych. Dopóki istnieje choć jeden węzeł, dopóty informacja o stanie całej sieci pozostaje kompletna. Aplikacja wykorzystuje bibliotekę logów `boost`, które przyjmują postać:
 
 ```
@@ -138,7 +141,7 @@ Logi rozpoczynające się od:
 - `<<< [type]` oznaczają odebranie analogicznej wiadomości,
 - `===> [type]` oznaczają wysłanie żądania od użytkownika (jak upload, pobranie czy usunięcie pliku).
 
-## 8) Opis wykorzystanych narzędzi
+## 9) Opis wykorzystanych narzędzi
 Użyliśmy:
 - `C++14`: obsługa przesyłanych komunikatów (np. `<vector>` używane w postaci buforów), sprytne wskaźniki (opóźnione instancjonowanie serwerów TCP i UDP) oraz w strukturze procesorów wiadomości (`<functional>`):
 ```c++
@@ -155,3 +158,36 @@ msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_ad
 ```
 - `boost`: unit-testy, zbierania logów. 
 - `POSIX`: obsługa współbieżności (threads, mutexes), a do obsługi sieci - gniazda BSD.
+
+## 10) Opis testów i ich wyników
+Testowaliśmy aplikację na 2 sposoby.
+
+### Unit testy
+Dla fragmentów, które na to pozwalały (takie jak np. wyliczanie hasha MD5, obsługa serwerów TCP i UDP, testowanie klas pomocniczych zarządzania plikami etc.) przeprowadzaliśmy wiele testów jednostkowych, co efektywnie przyśpieszyło rozwój samej implementacji protokołu (mając pewność co do poprawności używanych modułów aplikacji).
+
+### Testy protokołu
+Zestawiliśmy ze sobą kilka maszyn wirtualnych połączonych bezpośrednim mostkiem do interfejsu sieciowego. Na docelowej konfiguracji testy przeprowadzane były na:
+
+- PC1: 4 maszyny wirtualne z Ubuntu 16.04 (PC podłączony po WiFi do sieci lokalnej)
+- PC2: 1 maszyna wirtualna z Ubuntu 16.04 (PC podłączony przez Ethernet)
+	
+#### Broadcasty UDP
+W takiej konfiguracji czasami występowały już problemy w dostarczaniu broadcastów do wszystkich węzłów. Sieć w wielu miejscach stara się odbudowywać w miarę możliwości utracone informacje (każda zmiana stanu jakiegoś deskryptora jest kolejną szansą na jego dotarcie do wszystkich węzłów). 
+
+Ich skutkiem była zdesynchronizowana baza deskryptorów sieciowych. Jednak nie powodowała ona całkowitego zniszczenia sieci (jeśli np. próbowalibyśmy się dostać do zasobu nieaktualnego, to węzeł odbiorczy sam odmówił przeprowadzenia transakcji - komenda CMD_REFUSED).
+
+#### Hazardy wersji deskryptorów
+Od czasu do czasu udawało się nam również doprowadzać do skrajnego hazardu deskryptorów (log z tej sytuacji w punkcie **7) Postać logów i plików konfiguracyjnych**) - kiedy 2 pliki o różnej nazwie mają ten sam hash MD5 i nie zostało to wychwycone przez funkcję `uploadFile()`. Przystępujemy wtedy do odrzucenia deskryptora utworzonego później. 
+
+Jednak ten przypadek był jeszcze bardziej złośliwy - nawet czasy uploadu były jednakowe. Błędem byłoby wzięcie dowolnego z pary skonfliktowanych deskryptorów - wtedy wiele węzłów mogłoby mieć ten sam fizycznie plik przechowywany pod różnymi nazwami (co po chwili doprowadziłoby do zduplikowania tego deskryptora przy dowolnej próbie przeniesienia czy uaktualnienia tego zasobu) - co też się na początku wydarzyło. 
+
+Przyjęliśmy, że zawsze wybierzemy wtedy nazwę leksykograficznie mniejszą. Dzięki temu nie zachodziły kolejne niejednoznaczności w sieci.
+
+#### Awaria węzła
+Zgodnie z opisem wstępnym każda awaria węzła jest traktowana jako awaryjne odłączenie węzła od sieci (w połączeniu z uznaniem plików, które przechowywał, jako utracone).
+
+Rozpatrzyliśmy też sytuację "miękkiej" awarii - czyli utraceniu jedynie połączenia do sieci. Wtedy węzeł pozostaje w stanie, w którym znalazł się przez awarią. Przy pierwszej próby dostępu do tego węzła nastąpi powiadomienie sieci o utracie kontaktu z tym węzłem.
+
+Po ponownym podłączeniu węzeł najpierw biernie nasłuchiwał broadcastów ze zmieniającymi się stanami plików. Po chwili byliśmy w stanie zażądać już jakiegoś zasobu z innego węzła (przez dynamiczne odbudowywanie sieci).
+
+Zaś po kontrolowanym wykonaniu zamknięcia (przez `endSession()`) udało nam się wyrzucić pliki przechowywane w tym węźle do innych, istniejących już wcześniej. Dzięki temu udało się nam odzyskać zasoby przechowywane w tym węźle (zostały przerzucone do starych węzłów, a potem na nowo opublikowane w sieci).
