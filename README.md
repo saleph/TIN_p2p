@@ -1,5 +1,6 @@
 ## 1) Informacje wstępne
 **Temat**: Napisać program obsługujący prosty protokół P2P.
+
 **Skład zespołu**: Tomasz Gałecki, Bartosz Kołodziejski, Marcin Kondras.
 
 **Data przekazania**:
