@@ -9,7 +9,7 @@ set(LIB_NAME p2pLib)
 set(APP_NAME p2p)
 set(TESTS_NAME p2pTests)
 
-SET(BOOST_LIBRARYDIR "~/boost_1_65_1")
+SET(BOOST_ROOT "~/boost_1_65_1")
 
 find_package(Boost COMPONENTS unit_test_framework log system filesystem REQUIRED)
 

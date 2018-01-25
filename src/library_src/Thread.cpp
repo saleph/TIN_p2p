@@ -1,4 +1,4 @@
-#include "thread.hpp"
+#include "Thread.hpp"
 #include <signal.h>
 #include <stdio.h>
 

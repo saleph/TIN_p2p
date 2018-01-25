@@ -12,11 +12,6 @@ namespace p2p {
         std::vector<FileDescriptor> networkDescriptors;
         std::vector<in_addr_t> nodesAddresses;
         Mutex mutex;
-
-        // starting state estimators
-        std::thread timer;
-        Mutex mutexIsStillNewNode;
-        bool isStillNewNode = true;
     }
 }
 
@@ -30,16 +25,15 @@ const char *p2p::getFormatedIp(in_addr_t addr) {
 
 void p2p::endSession() {
     util::quitFromNetwork();
+    usleep(100000);
     util::udpServer->stopListening();
     util::tcpServer->stopListening();
 
     // wait for performed actions
-    usleep(10000);
+    usleep(100000);
     Guard guard(util::mutex);
     util::tcpServer.reset();
     util::tcpServer.reset();
-    // prevent corruption
-    util::timer.join();
 }
 
 void p2p::startSession() {
@@ -47,11 +41,6 @@ void p2p::startSession() {
     // as long as the node is marked as "new" it collects all the HELLO_REPLY,
     // what is not what we want for older nodes
     using namespace util;
-    timer = std::thread([&isStillNewNode, &mutexIsStillNewNode, NEW_NODE_STATE_DURATION_MS]() {
-        usleep(NEW_NODE_STATE_DURATION_MS * 1000);
-        Guard guard(util::mutexIsStillNewNode);
-        isStillNewNode = false;
-    });
     initProcessingFunctions();
     tcpServer = std::make_shared<TcpServer>(&processTcpMsg, &processTcpError);
     udpServer = std::make_shared<UdpServer>(&processUdpMsg);
@@ -184,6 +173,8 @@ in_addr_t p2p::util::findLeastLoadedNode() {
 
     std::unordered_map<in_addr_t, int> nodesLoad;
 
+    nodesLoad[tcpServer->getLocalhostIp()] = 0;
+
     // initialize loads
     for (auto &&address : nodesAddresses) {
         nodesLoad[address] = 0;
@@ -219,7 +210,7 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
         nodesLoad[address] = 0;
     }
 
-    // count uses
+    // count load
     for (auto &&descriptor : networkDescriptors) {
         nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
     }

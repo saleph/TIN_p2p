@@ -1,9 +1,9 @@
 #define BOOST_TEST_NO_LIB
 #include <boost/test/unit_test.hpp>
 
-#include "fileDescriptor.hpp"
-#include "md5sum.hpp"
-#include "md5hash.hpp"
+#include "FileDescriptor.hpp"
+#include "Md5sum.hpp"
+#include "Md5hash.hpp"
 #include <sys/stat.h>
 #include <stdexcept>
 

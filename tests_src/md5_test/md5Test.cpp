@@ -1,7 +1,7 @@
 #define BOOST_TEST_NO_LIB
 #include <boost/test/unit_test.hpp>
 
-#include "md5sum.hpp"
+#include "Md5sum.hpp"
 
 BOOST_AUTO_TEST_SUITE(Md5Test);
 

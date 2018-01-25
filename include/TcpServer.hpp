@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 
-#include "server.hpp"
+#include "Server.hpp"
 
 class TcpServer : public Server
 {

@@ -1,4 +1,4 @@
-#include "fileDescriptor.hpp"
+#include "FileDescriptor.hpp"
 
 FileDescriptor::FileDescriptor(const std::string& filename) {
 	setName(filename);

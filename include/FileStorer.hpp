@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include "md5hash.hpp"
-#include "md5sum.hpp"
+#include "Md5hash.hpp"
+#include "Md5sum.hpp"
 
 class FileStorer {
 public:

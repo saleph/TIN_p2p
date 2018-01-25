@@ -1,8 +1,8 @@
 #include <boost/test/unit_test.hpp>
 
-#include "p2pMessage.hpp"
-#include "tcp_server.hpp"
-#include "udp_server.hpp"
+#include "P2PMessage.hpp"
+#include "TcpServer.hpp"
+#include "UdpServer.hpp"
 //____________________________________________________________________________//
 
 BOOST_AUTO_TEST_SUITE(ServerTests)

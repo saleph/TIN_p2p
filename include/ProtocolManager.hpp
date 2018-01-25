@@ -3,21 +3,21 @@
 
 
 #include <memory>
-#include "udp_server.hpp"
-#include "tcp_server.hpp"
-#include "p2pMessage.hpp"
-#include "messageType.hpp"
-#include "fileDescriptor.hpp"
+#include "UdpServer.hpp"
+#include "TcpServer.hpp"
+#include "P2PMessage.hpp"
+#include "MessageType.hpp"
+#include "FileDescriptor.hpp"
 #include <boost/log/trivial.hpp>
 #include <unordered_map>
 #include <vector>
-#include <p2pMessage.hpp>
+#include <P2PMessage.hpp>
 #include <iostream>
 #include <FileStorer.hpp>
 #include <thread>
 #include "FileLoader.hpp"
-#include "mutex.hpp"
-#include "guard.hpp"
+#include "Mutex.hpp"
+#include "Guard.hpp"
 #include "FileDeleter.hpp"
 
 namespace p2p {
@@ -45,12 +45,6 @@ namespace p2p {
         extern std::vector<FileDescriptor> networkDescriptors;
         extern std::vector<in_addr_t> nodesAddresses;
         extern Mutex mutex;
-
-        // starting state estimators
-        const unsigned NEW_NODE_STATE_DURATION_MS = 5000u;
-        extern bool isStillNewNode;
-        extern std::thread timer;
-        extern Mutex mutexIsStillNewNode;
 
         void initProcessingFunctions();
         uint32_t getAverageNodesLoad();

@@ -2,9 +2,9 @@
 #define INCLUDE_FILEDESCRIPTOR_HPP_
 
 
-#include "md5hash.hpp"
-#include "md5sum.hpp"
-#include "messageType.hpp"
+#include "Md5hash.hpp"
+#include "Md5sum.hpp"
+#include "MessageType.hpp"
 #include <stdint.h>
 #include <stdexcept>
 #include <cstring>
