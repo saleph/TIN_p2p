@@ -163,7 +163,7 @@ void UserInterface::showFileDescriptors(std::vector<FileDescriptor> fileDescript
     for (auto &&fileDescriptor : fileDescriptors) {
         std::cout << ++i << ". "  << (fileDescriptor.isValid() ? " ": "#");
         std::cout << " name: " << fileDescriptor.getName();
-        std::cout << "\tmd5: " << fileDescriptor.getMd5().getHash();
+        std::cout << "\tmd5: " << fileDescriptor.getMd5().getHash().substr(0,7);
         std::cout << "\towner: " << p2p::getFormatedIp(fileDescriptor.getOwnerIp());
         std::cout << "\tholder: " << p2p::getFormatedIp(fileDescriptor.getHolderIp());
         std::cout << "\tsize: " << fileDescriptor.getSize();
