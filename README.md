@@ -1,4 +1,9 @@
-# p2p_FileDistributor
+## 1) Informacje wstępne
+**Temat**: Napisać program obsługujący prosty protokół P2P.
+**Skład zespołu**: Tomasz Gałecki, Bartosz Kołodziejski, Marcin Kondras.
+
+**Data przekazania**:
+
 
 ## 2) Interpretacja i doprecyzowanie treści
 - Plik jest identyfikowany nazwą oraz hashem (MD5), jednak sam hash nie jest wykorzystywany do innego celu niż identyfikacja pliku (mapowanie h >> n jest nie do końca intuicyjne, bo: adresy IP mogą być nieciągłe oraz mogą zostawiać dowolne, nieprzewidziane odległości między sobą w przypadku odłączania węzłów). Informacja o węźle przetrzymującym plik będzie zawarta w deskryptorze pliku. Jego głównym wyróżnikiem jest hash MD5 - dopóki hashe są różne - pliki mogą mieć takie same nazwy.
@@ -75,8 +80,8 @@ struct FileDescriptor {
 
 ### Zależności czasowe
 
-![diagram sekwencji](docs/apidiagrams.png "Diagram sekwencji")
-![diagram sekwencji](docs/join_disconnect.png "Diagram sekwencji")
+![diagram sekwencji](https://github.com/saleph/TIN_p2p/blob/dev/docs/apidiagrams.png)
+![diagram sekwencji](https://github.com/saleph/TIN_p2p/blob/dev/docs/join_disconnect.png)
 
 ## 5) Moduły i realizacja współbieżności
 ### Moduły
@@ -92,10 +97,10 @@ Proces początkowy realizuje obsługę interfejsu użytkownika oraz startuje oso
 
 ![współbieżność](https://github.com/saleph/TIN_p2p/blob/master/docs/concurrencydiagram.png "Realizacja współbieżności")
 
-## 6) Serwery TCP i UDP
+### Serwery TCP i UDP
 Serwery TCP i UDP stosują strategię jeden wątek na każde połączenie. Zarządzają one pulą wątków obsługujących aktywne połączenia, do której wątek zostaje dopisany przy stworzeniu nowego połączenia i wypisany przy zakończeniu obsługi. Kiedy węzeł odłącza się od sieci, serwery zamykają gniazda nasłuchujące na nowe połączenia i czekają aż pula wątków aktywnych połączeń zostanie opróżniona, co pozwala na poprawne zakończenie transmisji.
 
-## 7) Interfejs użytkownika
+## 6) Interfejs użytkownika
 Interfejs użytkownika implementuje podstawowe akcje do wykonania w stosunku do sieci.
 ```
 Available commands:
@@ -121,7 +126,7 @@ Available commands:
 Wersje z dodatkowym hashem MD5 są konieczne tylko w przypadku, kiedy wybraliśmy plik, który posiada swoje odpowiedniki o tych samych nazwach (ale różnej zawartości!). W takim wypadku interfejs sam poprosi nas o użycie odpowiedniej komendy.
 Ścieżki do plików są rozwijane względem katalogu uruchomienia głównej binarki.
 
-## 8) Postać logów i plików konfiguracyjnych
+## 7) Postać logów i plików konfiguracyjnych
 Projekt nie wymagał użycia dodatkowych plików konfiguracyjnych. Dopóki istnieje choć jeden węzeł, dopóty informacja o stanie całej sieci pozostaje kompletna. Aplikacja wykorzystuje bibliotekę logów `boost`, które przyjmują postać:
 
 ```
@@ -141,7 +146,7 @@ Logi rozpoczynające się od:
 - `<<< [type]` oznaczają odebranie analogicznej wiadomości,
 - `===> [type]` oznaczają wysłanie żądania od użytkownika (jak upload, pobranie czy usunięcie pliku).
 
-## 9) Opis wykorzystanych narzędzi
+## 8) Opis wykorzystanych narzędzi
 Użyliśmy:
 - `C++14`: obsługa przesyłanych komunikatów (np. `<vector>` używane w postaci buforów), sprytne wskaźniki (opóźnione instancjonowanie serwerów TCP i UDP) oraz w strukturze procesorów wiadomości (`<functional>`):
 ```c++
@@ -159,7 +164,7 @@ msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_ad
 - `boost`: unit-testy, zbierania logów. 
 - `POSIX`: obsługa współbieżności (threads, mutexes), a do obsługi sieci - gniazda BSD.
 
-## 10) Opis testów i ich wyników
+## 9) Opis testów i ich wyników
 Testowaliśmy aplikację na 2 sposoby.
 
 ### Unit testy
