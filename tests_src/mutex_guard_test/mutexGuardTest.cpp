@@ -1,8 +1,8 @@
 #define BOOST_TEST_NO_LIB
 #include <pthread.h>
 #include <boost/test/unit_test.hpp>
-#include "guard.hpp"
-#include "mutex.hpp"
+#include "Guard.hpp"
+#include "Mutex.hpp"
 
 BOOST_AUTO_TEST_SUITE(MutexTest);
 

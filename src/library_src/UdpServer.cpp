@@ -1,11 +1,11 @@
-#include "udp_server.hpp"
+#include "UdpServer.hpp"
 
 #include <string.h>
 #include <iostream>
 #include <unistd.h>
 #include <errno.h>
 
-#include "socket_exceptions.hpp"
+#include "SocketExceptions.hpp"
 
 #define BUF_SIZE 1024
 

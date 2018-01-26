@@ -5,9 +5,9 @@
 #include <vector>
 #include <atomic>
 
-#include "socket_operation.hpp"
-#include "thread.hpp"
-#include "guard.hpp"
+#include "SocketOperation.hpp"
+#include "Thread.hpp"
+#include "Guard.hpp"
 
 class Server
 {

@@ -1,12 +1,4 @@
-#include <p2pMessage.hpp>
-#include <iostream>
-#include <FileStorer.hpp>
-#include <thread>
-#include "FileLoader.hpp"
-#include "mutex.hpp"
-#include "guard.hpp"
 #include "ProtocolManager.hpp"
-#include "FileDeleter.hpp"
 
 // definitions HAVE TO BE THERE
 // otherwise - multiple definitions error
@@ -20,81 +12,28 @@ namespace p2p {
         std::vector<FileDescriptor> networkDescriptors;
         std::vector<in_addr_t> nodesAddresses;
         Mutex mutex;
-
-        // starting state estimators
-        const unsigned NEW_NODE_STATE_DURATION_MS = 5000u;
-        std::thread timer;
-        Mutex mutexIsStillNewNode;
-        bool isStillNewNode = true;
-
-        void processTcpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
-
-        void processTcpError(SocketOperation operation);
-
-        void processUdpMsg(uint8_t *data, uint32_t size, SocketOperation operation);
-
-        void initProcessingFunctions();
-
-        void joinToNetwork();
-
-        void quitFromNetwork();
-
-        void moveLocalDescriptorsIntoOtherNodes();
-
-        in_addr_t findLeastLoadedNode();
-
-        void discardDescriptor(FileDescriptor &descriptor);
-
-        void changeHolderNode(FileDescriptor &descriptor, in_addr_t send);
-
-        std::vector<uint8_t> getFileContent(const std::string &name);
-
-        void storeFileContent(std::vector<uint8_t> &content, const std::string &name);
-
-        void publishDescriptor(FileDescriptor &descriptor);
-
-        void uploadFile(FileDescriptor &descriptor);
-
-        in_addr_t findOtherLeastLoadedNode();
-
-        void removeDuplicatesFromLists();
-
-        void sendCommandRefused(MessageType messageType, const char *msg, in_addr_t sourceAddress);
-
-        void sendShutdown();
-
-        void publishLostNode(in_addr_t nodeAddress);
-
-        void requestGetFile(FileDescriptor &descriptor);
-
-        void requestDeleteFile(FileDescriptor &descriptor);
-
-        bool isDescriptorUnique(FileDescriptor &descriptor);
-
-        FileDescriptor &getRepetedDescriptor(FileDescriptor &descriptor);
-
     }
+}
 
-    const char *getFormatedIp(in_addr_t addr) {
-        if (addr == util::tcpServer->getLocalhostIp()) {
-            return ">>THIS HOST<<";
-        }
-        return inet_ntoa(*(in_addr *) &addr);
+
+const char *p2p::getFormatedIp(in_addr_t addr) {
+    if (addr == util::tcpServer->getLocalhostIp()) {
+        return ">>THIS HOST<<";
     }
+    return inet_ntoa(*(in_addr *) &addr);
 }
 
 void p2p::endSession() {
     util::quitFromNetwork();
+    usleep(100000);
     util::udpServer->stopListening();
     util::tcpServer->stopListening();
 
     // wait for performed actions
-    usleep(10000);
+    usleep(100000);
     Guard guard(util::mutex);
     util::tcpServer.reset();
     util::tcpServer.reset();
-    // prevent corruption
-    util::timer.join();
 }
 
 void p2p::startSession() {
@@ -102,11 +41,6 @@ void p2p::startSession() {
     // as long as the node is marked as "new" it collects all the HELLO_REPLY,
     // what is not what we want for older nodes
     using namespace util;
-    timer = std::thread([&isStillNewNode, &mutexIsStillNewNode, NEW_NODE_STATE_DURATION_MS]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(NEW_NODE_STATE_DURATION_MS));
-        Guard guard(util::mutexIsStillNewNode);
-        isStillNewNode = false;
-    });
     initProcessingFunctions();
     tcpServer = std::make_shared<TcpServer>(&processTcpMsg, &processTcpError);
     udpServer = std::make_shared<UdpServer>(&processUdpMsg);
@@ -185,6 +119,7 @@ void p2p::util::sendShutdown() {
     P2PMessage message{};
     message.setMessageType(MessageType::SHUTDOWN);
     message.setAdditionalDataSize(0);
+    BOOST_LOG_TRIVIAL(debug) << ">>> SHUTDOWN: node is closing";
 
     udpServer->broadcast((uint8_t *) &message, sizeof(P2PMessage));
 }
@@ -238,6 +173,8 @@ in_addr_t p2p::util::findLeastLoadedNode() {
 
     std::unordered_map<in_addr_t, int> nodesLoad;
 
+    nodesLoad[tcpServer->getLocalhostIp()] = 0;
+
     // initialize loads
     for (auto &&address : nodesAddresses) {
         nodesLoad[address] = 0;
@@ -273,7 +210,7 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
         nodesLoad[address] = 0;
     }
 
-    // count uses
+    // count load
     for (auto &&descriptor : networkDescriptors) {
         nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
     }
@@ -281,7 +218,7 @@ in_addr_t p2p::util::findOtherLeastLoadedNode() {
     in_addr_t leastLoadNode{};
     unsigned long min = ULONG_MAX;
     // find min element
-    for (auto && nodeLoad : nodesLoad) {
+    for (auto &&nodeLoad : nodesLoad) {
         if (nodeLoad.second < min && nodeLoad.first != thisNodeAddress) {
             min = nodeLoad.second;
             leastLoadNode = nodeLoad.first;
@@ -331,7 +268,7 @@ void p2p::util::storeFileContent(std::vector<uint8_t> &content, const std::strin
     storer.storeFile(content);
 }
 
-bool p2p::uploadFile(const std::string &name) {
+bool p2p::uploadFile(std::string name) {
     using namespace util;
     // create new descriptor (autofill MD5 and its size)
     FileDescriptor newDescriptor(name);
@@ -370,7 +307,7 @@ bool p2p::uploadFile(const std::string &name) {
 
         // we are the least load node - only publish the descriptor
         util::publishDescriptor(newDescriptor);
-        BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on this host";
+        BOOST_LOG_TRIVIAL(debug) << "===> UploadFile: " << newDescriptor.getName() << " saved on >>THIS HOST<<";
 
         Guard guard(util::mutex);
         util::localDescriptors.push_back(newDescriptor);
@@ -418,28 +355,67 @@ void p2p::util::uploadFile(FileDescriptor &descriptor) {
     tcpServer->sendData(buffer.data(), buffer.size(), holderNode);
 }
 
-bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
+bool p2p::getFile(std::string name) {
+    using namespace util;
+    FileDescriptor descriptor;
+    {
+        Guard guard(mutex);
+
+        // find repetitions
+        long filesWithSameName = std::count_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                               [&name](const FileDescriptor &fd) {
+                                                   return fd.getName() == name;
+                                               });
+
+        if (filesWithSameName > 1) {
+            BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
+                                    << " hashes collision! Use command <filename> <md5>";
+            return false;
+        }
+
+        auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                              [&name](const FileDescriptor &fd) {
+                                                  return fd.getName() == name;
+                                              });
+        if (descriptorPointer == networkDescriptors.end()) {
+            BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
+                                    << " does not exists in the network, try again";
+            return false;
+        }
+        descriptor = *descriptorPointer;
+    }
+
+    return getFile(descriptor);
+}
+
+bool p2p::getFile(std::string name, std::string hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
                                               [&hash](const FileDescriptor &fd) {
-                                                  return fd.getMd5() == hash;
+                                                  return fd.getMd5().getHash() == hash;
                                               });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
-                                    << " md5: " << hash.getHash()
+                                    << " md5: " << hash
                                     << " does not exists in the network, try again";
             return false;
         }
         descriptor = *descriptorPointer;
     }
+
+    return getFile(descriptor);
+}
+
+bool p2p::util::getFile(FileDescriptor &descriptor) {
+    using namespace util;
     // check if file is stored on our host
     if (descriptor.getHolderIp() == tcpServer->getLocalhostIp()) {
-        BOOST_LOG_TRIVIAL(info) << "===> getFile: " << name
-                                << " md5: " << hash.getHash()
-                                << " is present on this host; rewrite the file";
+        BOOST_LOG_TRIVIAL(info) << "===> getFile: " << descriptor.getName()
+                                << " md5: " << descriptor.getMd5().getHash()
+                                << " is present on >>THIS HOST<<; rewrite the file";
         // we already have the file - just rewrite the file
         FileLoader loader(descriptor.getMd5().getHash());
         auto content = loader.getContent();
@@ -451,7 +427,6 @@ bool p2p::getFile(const std::string &name, const Md5Hash &hash) {
     util::requestGetFile(descriptor);
     return true;
 }
-
 
 void p2p::util::requestGetFile(FileDescriptor &descriptor) {
     P2PMessage message{};
@@ -469,31 +444,76 @@ void p2p::util::requestGetFile(FileDescriptor &descriptor) {
                              << " md5: " << descriptor.getMd5().getHash();
 }
 
-bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
+bool p2p::deleteFile(std::string name, std::string hash) {
     using namespace util;
     FileDescriptor descriptor;
     {
         Guard guard(mutex);
         auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
                                               [&hash](const FileDescriptor &fd) {
-                                                  return fd.getMd5() == hash;
+                                                  return fd.getMd5().getHash() == hash;
                                               });
         if (descriptorPointer == networkDescriptors.end() || descriptorPointer->getName() != name) {
             BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                    << " md5: " << hash.getHash()
+                                    << " md5: " << hash
                                     << " does not exists in the network, try again";
             return false;
         }
         descriptor = *descriptorPointer;
+    }
 
-        // check unauthorized access
-        if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
+    return deleteFile(descriptor);
+}
+
+bool p2p::deleteFile(std::string name) {
+    using namespace util;
+    FileDescriptor descriptor;
+    {
+        Guard guard(mutex); // find repetitions
+        long filesWithSameName = std::count_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                               [&name](const FileDescriptor &fd) {
+                                                   return fd.getName() == name;
+                                               });
+
+        if (filesWithSameName > 1) {
             BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
-                                    << " md5: " << hash.getHash()
-                                    << " you are not the owner! Owner ip: "
-                                    << getFormatedIp(descriptor.getOwnerIp());
+                                    << " hashes collision! Use command <filename> <md5>";
             return false;
         }
+
+        auto descriptorPointer = std::find_if(networkDescriptors.begin(), networkDescriptors.end(),
+                                              [&name](const FileDescriptor &fd) {
+                                                  return fd.getName() == name;
+                                              });
+
+        if (descriptorPointer == networkDescriptors.end()) {
+            BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
+                                    << " does not exists in the network, try again";
+            return false;
+        }
+        descriptor = *descriptorPointer;
+    }
+
+    if (!descriptor.isValid()) {
+        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << name
+                                << " is already being proceed (it's invalid now). Try again for a while.";
+        return false;
+    }
+
+    return deleteFile(descriptor);
+}
+
+
+bool p2p::util::deleteFile(FileDescriptor &descriptor) {
+    using namespace util;
+
+    // check unauthorized access
+    if (descriptor.getOwnerIp() != tcpServer->getLocalhostIp()) {
+        BOOST_LOG_TRIVIAL(info) << "===> deleteFile: " << descriptor.getName()
+                                << " md5: " << descriptor.getMd5().getHash()
+                                << " you are not the owner! Owner ip: "
+                                << getFormatedIp(descriptor.getOwnerIp());
+        return false;
     }
 
     // discard descriptor
@@ -503,7 +523,6 @@ bool p2p::deleteFile(const std::string &name, const Md5Hash &hash) {
     return true;
 }
 
-
 void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
     P2PMessage message{};
     message.setMessageType(MessageType::DELETE_FILE);
@@ -511,8 +530,8 @@ void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
 
     // prepare buffer
     std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
-    memcpy(buffer.data(), &message, sizeof(P2PMessage));
-    memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
+    memcpy(buffer.data(), (uint8_t *) &message, sizeof(P2PMessage));
+    memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t *) &descriptor, sizeof(FileDescriptor));
 
     // send request
     tcpServer->sendData(buffer.data(), buffer.size(), descriptor.getHolderIp());
@@ -520,408 +539,8 @@ void p2p::util::requestDeleteFile(FileDescriptor &descriptor) {
                              << " md5: " << descriptor.getMd5().getHash();
 }
 
-void p2p::util::initProcessingFunctions() {
-    // first message sent by new node; in reply we pass our local descriptors
-    msgProcessors[MessageType::HELLO] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        if (sourceAddress == udpServer->getLocalhostIp()) {
-            // its our hello
-            return;
-        }
-        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO from: " << getFormatedIp(sourceAddress);
-        Guard guard(mutex);
-        // save node address for later
-        nodesAddresses.push_back(sourceAddress);
-
-        // construct p2pmessage
-        P2PMessage message = {};
-        message.setMessageType(MessageType::HELLO_REPLY);
-        unsigned long additionalDataSize = localDescriptors.size() * sizeof(FileDescriptor);
-        message.setAdditionalDataSize(additionalDataSize);
-
-        // create a vector with size of the whole message (empty)
-        std::vector<uint8_t> buffer(additionalDataSize + sizeof(P2PMessage));
-
-        // write into underlying array P2Pmessage
-        memcpy(buffer.data(), &message, sizeof(P2PMessage));
-
-        // write descriptors
-        memcpy(buffer.data() + sizeof(P2PMessage),
-               (uint8_t *) localDescriptors.data(),
-               localDescriptors.size() * sizeof(FileDescriptor));
-
-        // send message
-        util::tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
-    };
-
-    // replay for other nodes
-    msgProcessors[MessageType::HELLO_REPLY] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        { // check if this node is already older node
-            Guard guard(mutexIsStillNewNode);
-            if (!isStillNewNode) {
-                // we are adult node and we have all descriptors
-                BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY: hello reply received as adult node - do nothing";
-                return;
-            } else {
-                // remove duplicates if present
-                removeDuplicatesFromLists();
-            }
-        }
-
-        if (sourceAddress == udpServer->getLocalhostIp()) {
-            // our broadcast, skip
-            return;
-        }
-        BOOST_LOG_TRIVIAL(debug) << "<<< HELLO_REPLY from: " << getFormatedIp(sourceAddress) << " "
-                                 << size / sizeof(FileDescriptor) << " descriptors received";
-
-        std::vector<FileDescriptor> buffer(size / sizeof(FileDescriptor));
-
-        // put descriptors
-        memcpy((uint8_t *) buffer.data(), data, size);
-
-        Guard guard(mutex);
-        // preserve source address
-        nodesAddresses.push_back(sourceAddress);
-        networkDescriptors.insert(networkDescriptors.end(), buffer.begin(), buffer.end());
-    };
-
-    // message sent by node, which starts shutdown; discards every his descriptor
-    // discarding is not neccessary (quiting node should do it even before this message)
-    // but it ensures, that no one will interrupt the collapsing node
-    msgProcessors[MessageType::DISCONNECTING] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        if (sourceAddress == udpServer->getLocalhostIp()) {
-            // our broadcast, skip
-            return;
-        }
-
-        Guard guard(mutex);
-        // mark descriptors of disconnecting node as discarded
-        for (auto &&descriptor : networkDescriptors) {
-            if (descriptor.getHolderIp() == sourceAddress) {
-                descriptor.makeUnvalid();
-            }
-        }
-        BOOST_LOG_TRIVIAL(debug) << "<<< DISCONNECTING: node " << sourceAddress << " start disconnecting";
-    };
-
-    // if someone signals that some node quit "definitely not gently"
-    msgProcessors[MessageType::CONNECTION_LOST] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        if (size != sizeof(in_addr_t)) {
-            throw std::runtime_error("CONNECTION_LOST: additional data does not contain IP address of the lost node");
-        }
-        // only additional information is lostNode IP
-        in_addr_t lostNodeAddress = *(in_addr_t *) data;
-
-        int lostDescriptorsNumber = 0;
-        Guard guard(mutex);
-        // revoke descriptors from lost node
-        networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                                [lostNodeAddress, &lostDescriptorsNumber](
-                                                        const FileDescriptor &fileDescriptor) {
-                                                    ++lostDescriptorsNumber;
-                                                    return fileDescriptor.getHolderIp() == lostNodeAddress;
-                                                }));
-        // remove node address from space
-        nodesAddresses.erase(std::remove_if(nodesAddresses.begin(), nodesAddresses.end(),
-                                            [sourceAddress](const in_addr_t &addr) {
-                                                return sourceAddress == addr;
-                                            }), nodesAddresses.end());
-        BOOST_LOG_TRIVIAL(debug) << "<<< CONNECTION_LOST: with node " << lostNodeAddress
-                                 << "; lost " << lostDescriptorsNumber << " descriptors";
-    };
-
-    // node refused to perform operation, which we requested for
-    msgProcessors[MessageType::CMD_REFUSED] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        MessageType messageType = *(MessageType *) data;
-
-        // get description of the problem
-        const char *errorDescription = (const char *) (data + sizeof(MessageType));
-
-        BOOST_LOG_TRIVIAL(info) << "<<< CMD_REFUSED: node " << getFormatedIp(sourceAddress)
-                                << " refused command, message: " << errorDescription;
-    };
-
-    // last message sent by collapsing node - nothing will be valid, so ensure that everything is deleted
-    msgProcessors[MessageType::SHUTDOWN] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) -> void {
-        if (sourceAddress == udpServer->getLocalhostIp()) {
-            // its our broadcast, skip
-            return;
-        }
-
-        Guard guard(mutex);
-        // remove all associated data
-        nodesAddresses.erase(std::remove_if(nodesAddresses.begin(), nodesAddresses.end(),
-                                            [sourceAddress](const in_addr_t &addr) {
-                                                return sourceAddress == addr;
-                                            }), nodesAddresses.end());
-        networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                                [sourceAddress](const FileDescriptor &fileDescriptor) {
-                                                    return fileDescriptor.getHolderIp() == sourceAddress;
-                                                }));
-        BOOST_LOG_TRIVIAL(debug) << "<<< SHUTDOWN: node " << getFormatedIp(sourceAddress) << " have been closed";
-    };
-
-    // new file descriptor received - put it into network descriptors list
-    msgProcessors[MessageType::NEW_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor newFileDescriptor = *(FileDescriptor *) data;
-
-        // check collisions
-        Guard guard(mutex);
-        if (!isDescriptorUnique(newFileDescriptor)) {
-            FileDescriptor repetedDescriptor = getRepetedDescriptor(newFileDescriptor);
-
-            BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: hashes collision! md5: "
-                                     << repetedDescriptor.getMd5().getHash()
-                                     << " upload times (old, new): "
-                                     << repetedDescriptor.getUploadTime() << " vs "
-                                     << newFileDescriptor.getUploadTime()
-                                     << "; earlier file choosen";
-
-            if (repetedDescriptor.getUploadTime() > newFileDescriptor.getUploadTime()) {
-                networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                [&repetedDescriptor](const FileDescriptor &fd) {
-                    return fd.getMd5() == repetedDescriptor.getMd5();
-                }));
-                networkDescriptors.push_back(newFileDescriptor);
-            }
-            return;
-        }
-
-        // normal insert
-        networkDescriptors.push_back(newFileDescriptor);
-
-        BOOST_LOG_TRIVIAL(debug) << "<<< NEW_FILE: " << newFileDescriptor.getName()
-                                 << " md5: " << newFileDescriptor.getMd5().getHash()
-                                 << " in node: " << getFormatedIp(sourceAddress);
-
-    };
-
-    msgProcessors[MessageType::REVOKE_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        if (size != sizeof(FileDescriptor)) {
-            throw std::runtime_error("REVOKE_FILE: received data is not a descriptor");
-        }
-        FileDescriptor revokedFileDescriptor = *(FileDescriptor *) data;
-
-        BOOST_LOG_TRIVIAL(debug) << "<<< REVOKE_FILE: " << revokedFileDescriptor.getName() << " "
-                                 << " md5: " << revokedFileDescriptor.getMd5().getHash();
-
-        Md5Hash revokedFileHash = revokedFileDescriptor.getMd5();
-
-        Guard guard(mutex);
-        networkDescriptors.erase(std::remove_if(networkDescriptors.begin(), networkDescriptors.end(),
-                                                [&revokedFileHash](const FileDescriptor &fileDescriptor) {
-                                                    return fileDescriptor.getMd5() == revokedFileHash;
-                                                }));
-    };
-
-    // discard descriptor request - file is present in network, but cannot be accessed nor deleted
-    msgProcessors[MessageType::DISCARD_DESCRIPTOR] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor descriptor = *(FileDescriptor *) data;
-        BOOST_LOG_TRIVIAL(debug) << "<<< DISCARD_DESCRIPTOR: " << descriptor.getName()
-                                 << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << getFormatedIp(sourceAddress);
-
-        Guard guard(mutex);
-        // make this descriptor no longer valid
-        for (auto &&networkDescriptor : networkDescriptors) {
-            if (networkDescriptor.getMd5() == descriptor.getMd5()) {
-                networkDescriptor.makeUnvalid();
-            }
-        }
-    };
-
-    // update descriptor request - something changed (holderNode)
-    msgProcessors[MessageType::UPDATE_DESCRIPTOR] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor updatedDescriptor = *(FileDescriptor *) data;
-
-        BOOST_LOG_TRIVIAL(debug) << "<<< UPDATE_DESCRIPTOR: " << updatedDescriptor.getName()
-                                 << " md5: " << updatedDescriptor.getMd5().getHash()
-                                 << " from " << getFormatedIp(sourceAddress);
-
-        Guard guard(mutex);
-        // update particular descriptor
-        for (auto &&networkDescriptor : networkDescriptors) {
-            if (networkDescriptor.getMd5() == updatedDescriptor.getMd5()) {
-                networkDescriptor = updatedDescriptor;
-            }
-        }
-    };
-
-    // received file to store locally. Store it and publish updated descriptor
-    msgProcessors[MessageType::HOLDER_CHANGE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor updatedDescriptor = *(FileDescriptor *) data;
-        BOOST_LOG_TRIVIAL(debug) << "<<< HOLDER_CHANGE: store here " << updatedDescriptor.getName()
-                                 << " md5: " << updatedDescriptor.getMd5().getHash()
-                                 << " from " << getFormatedIp(sourceAddress);
-        // this descriptor will be valid now
-        updatedDescriptor.makeValid();
-
-        // get file content
-        std::vector<uint8_t> fileContent(size - sizeof(FileDescriptor));
-        memcpy(fileContent.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
-
-        // store this file by its md5 hash
-        storeFileContent(fileContent, updatedDescriptor.getMd5().getHash());
-
-        // update local descriptors table
-        {
-            Guard guard(mutex);
-            localDescriptors.push_back(updatedDescriptor);
-        }
-
-        // publish new descriptor
-        P2PMessage message{};
-        message.setMessageType(MessageType::UPDATE_DESCRIPTOR);
-        message.setAdditionalDataSize(sizeof(FileDescriptor));
-
-        // prepare message
-        std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
-        memcpy(buffer.data(), (uint8_t *) &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t *) &updatedDescriptor, sizeof(FileDescriptor));
-
-        udpServer->broadcast(buffer.data(), buffer.size());
-        BOOST_LOG_TRIVIAL(debug) << ">>> UPDATE_DESCRIPTOR: " << updatedDescriptor.getName()
-                                 << " md5: " << updatedDescriptor.getMd5().getHash();
-    };
-
-    // reply for our request for file
-    msgProcessors[MessageType::FILE_TRANSFER] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor descriptor = *(FileDescriptor *) data;
-
-        // at the beginning was the descriptor present
-        std::vector<uint8_t> buffer(size - sizeof(FileDescriptor));
-
-        // copy the file content to our buffer
-        memcpy(buffer.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
-
-        // store received file into FS
-        storeFileContent(buffer, descriptor.getName());
-        auto storedFileHash = Md5sum(descriptor.getName()).getMd5Hash();
-
-        // check hash
-        if (storedFileHash != descriptor.getMd5()) {
-            BOOST_LOG_TRIVIAL(debug) << "<<< FILE_TRANSFER: md5 differs!!! is: "
-                                     << storedFileHash.getHash()
-                                     << " should be: " << descriptor.getMd5().getHash();
-            return;
-        }
-
-        BOOST_LOG_TRIVIAL(debug) << "<<< FILE_TRANSFER: received " << descriptor.getName()
-                                 << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << getFormatedIp(sourceAddress);
-    };
-
-    // request for upload a file: other node send us a file via TCP and we have to publish it in the network
-    msgProcessors[MessageType::UPLOAD_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor descriptor = *(FileDescriptor *) data;
-
-        // prepare buffer
-        std::vector<uint8_t> buffer(size - sizeof(FileDescriptor));
-        // copy file content
-        memcpy(buffer.data(), data + sizeof(FileDescriptor), size - sizeof(FileDescriptor));
-        // store file as its hash
-        auto newFileName = descriptor.getMd5().getHash();
-        storeFileContent(buffer, newFileName);
-        // check hash
-        auto newFileHash = Md5sum(newFileName).getMd5Hash();
-
-        if (newFileHash != descriptor.getMd5()) {
-            BOOST_LOG_TRIVIAL(debug) << "<<< UPLOAD_FILE: hashes differ!!! is: " << newFileHash.getHash()
-                                     << " should be: " << descriptor.getMd5().getHash()
-                                     << "; file not published into networ";
-            sendCommandRefused(MessageType::UPLOAD_FILE, "file's hash differ! Try again.", sourceAddress);
-            // does nothing more, network does not now about the file
-            return;
-        }
-
-        // we have valid file here
-        BOOST_LOG_TRIVIAL(debug) << ">>> NEW_FILE: publishing descriptor into the network of the "
-                                 << "properly received file " << descriptor.getName()
-                                 << " md5: " << descriptor.getMd5().getHash();
-        {
-            // append to our local descriptors
-            Guard guard(mutex);
-            localDescriptors.push_back(descriptor);
-        }
-
-        // notify the network about new file
-        P2PMessage message{};
-        message.setMessageType(MessageType::NEW_FILE);
-        message.setAdditionalDataSize(sizeof(FileDescriptor));
-
-        buffer.resize(sizeof(P2PMessage) + message.getAdditionalDataSize());
-
-        memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), (uint8_t *) &descriptor, sizeof(FileDescriptor));
-
-        udpServer->broadcast(buffer.data(), buffer.size());
-    };
-
-    // other node want to access a file stored in our node
-    msgProcessors[MessageType::GET_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        FileDescriptor descriptor = *(FileDescriptor *) data;
-        BOOST_LOG_TRIVIAL(debug) << "<<< GET_FILE: request for " << descriptor.getName()
-                                 << " md5: " << descriptor.getMd5().getHash()
-                                 << " from " << getFormatedIp(sourceAddress);
-
-        P2PMessage message{};
-        // set message type as file transfer
-        message.setMessageType(MessageType::FILE_TRANSFER);
-        // get file content
-        auto fileContent = getFileContent(descriptor.getMd5().getHash());
-        // set msg additional size to size of the descriptor and file content length
-        message.setAdditionalDataSize(sizeof(FileDescriptor) + fileContent.size());
-        // prepare buffer
-        std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
-
-        // prepare message
-        memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
-        memcpy(buffer.data() + sizeof(P2PMessage) + sizeof(FileDescriptor), fileContent.data(), fileContent.size());
-
-        tcpServer->sendData(buffer.data(), buffer.size(), sourceAddress);
-    };
-
-    // someone requested to delete file sored in our machine
-    msgProcessors[MessageType::DELETE_FILE] = [](const uint8_t *data, uint32_t size, in_addr_t sourceAddress) {
-        // file was discarded already by request node - we have to delete it and publish REVOKE
-        FileDescriptor descriptor = *(FileDescriptor *) data;
-
-        Guard guard(mutex);
-
-        FileDeleter deleter(descriptor.getMd5().getHash());
-        if (!deleter.deleteFile()) {
-            BOOST_LOG_TRIVIAL(debug) << "<<< DELETE_FILE: " << descriptor.getName()
-                                     << " md5: " << descriptor.getMd5().getHash()
-                                     << " does not exist!; send cmd_refused";
-            sendCommandRefused(MessageType::DELETE_FILE, "file does not exist", sourceAddress);
-            return;
-        }
-
-        auto removedFileHash = descriptor.getMd5();
-        // file successfully deleted!
-        // remove descriptor from localDescriptors
-        localDescriptors.erase(std::remove_if(localDescriptors.begin(), localDescriptors.end(),
-                                              [&removedFileHash](const FileDescriptor &fd) {
-                                                  return fd.getMd5() == removedFileHash;
-                                              }));
-
-        // publish revoke
-        P2PMessage message{};
-        message.setMessageType(MessageType::REVOKE_FILE);
-        message.setAdditionalDataSize(sizeof(FileDescriptor));
-
-        std::vector<uint8_t> buffer(sizeof(P2PMessage) + message.getAdditionalDataSize());
-        memcpy(buffer.data(), &message, sizeof(P2PMessage));
-        memcpy(buffer.data() + sizeof(P2PMessage), &descriptor, sizeof(FileDescriptor));
-
-        udpServer->broadcast(buffer.data(), buffer.size());
-    };
-
-}
-
 void p2p::util::removeDuplicatesFromLists() {
-    Guard guard(mutex);
+    // mutex already acquired
     auto descriptorSorter = [](const FileDescriptor &fd1, const FileDescriptor &fd2) {
         return fd1.getMd5().getHash() > fd2.getMd5().getHash();
     };
@@ -967,6 +586,71 @@ FileDescriptor &p2p::util::getRepetedDescriptor(FileDescriptor &descriptor) {
     for (auto &&networkDescriptor : networkDescriptors) {
         if (networkDescriptor.getMd5() == descriptor.getMd5()) {
             return networkDescriptor;
+        }
+    }
+}
+
+std::vector<FileDescriptor> p2p::getLocalFileDescriptors() {
+    using namespace util;
+    Guard guard(mutex);
+    return util::localDescriptors;
+}
+
+std::vector<FileDescriptor> p2p::getNetworkFileDescriptors() {
+    using namespace util;
+    Guard guard(mutex);
+    return util::networkDescriptors;
+}
+
+uint32_t p2p::util::getAverageNodesLoad() {
+    Guard guard(mutex);
+
+    // map for easier collection of data
+    std::unordered_map<in_addr_t, uint32_t> nodesLoad;
+
+    nodesLoad[tcpServer->getLocalhostIp()] = 0;
+
+    // initialize loads
+    for (auto &&address : nodesAddresses) {
+        nodesLoad[address] = 0;
+    }
+
+    // count uses
+    for (auto &&descriptor : networkDescriptors) {
+        nodesLoad[descriptor.getHolderIp()] += descriptor.getSize();
+    }
+
+    uint32_t sum = 0;
+    for (auto &&nodeLoad : nodesLoad) {
+        sum += nodeLoad.second;
+    }
+
+    return sum / (uint32_t) nodesLoad.size();
+}
+
+uint32_t p2p::util::getThisNodeLoad() {
+    Guard guard(mutex);
+
+    uint32_t sum = 0;
+    for (auto &&localDescriptor : localDescriptors) {
+        sum += localDescriptor.getSize();
+    }
+
+    return sum;
+}
+
+void p2p::util::moveFilesWithSumaricSizeToNode(int64_t sizeToMove, in_addr_t sourceAddress) {
+    Guard guard(mutex);
+
+    // iterate over local descriptor
+    for (auto it = localDescriptors.begin(); it != localDescriptors.end() && sizeToMove > 0;) {
+        if (it->getSize() <= sizeToMove) {
+            sizeToMove -= it->getSize();
+            // do "HOLDER_CHANGE"
+            changeHolderNode(*it, sourceAddress);
+            it = localDescriptors.erase(it);
+        } else {
+            ++it;
         }
     }
 }

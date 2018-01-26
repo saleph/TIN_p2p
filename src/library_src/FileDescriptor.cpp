@@ -1,9 +1,13 @@
-#include "fileDescriptor.hpp"
+#include "FileDescriptor.hpp"
 
 FileDescriptor::FileDescriptor(const std::string& filename) {
 	setName(filename);
 	this->size = obtainFileSize(name);
 	this->md5 = Md5sum(filename).getMd5Hash();
+}
+
+FileDescriptor::FileDescriptor(const FileDescriptor &other) {
+    *this = other;
 }
 
 const Md5Hash& FileDescriptor::getMd5() const {
@@ -55,12 +59,13 @@ uint32_t FileDescriptor::obtainFileSize(const char* fn) {
 	return st.st_size;
 }
 
-void FileDescriptor::setName(const std::string& name) {
-	if (name.size() > MAX_FILENAME_LEN) {
+void FileDescriptor::setName(std::string filename) {
+	if (filename.size() > MAX_FILENAME_LEN) {
 		throw std::invalid_argument("filename can't be longer than "
 				+ std::to_string(MAX_FILENAME_LEN));
 	}
-	strcpy(this->name, name.c_str());
+    std::copy(filename.begin(), filename.end(), name);
+    name[filename.size()] = 0;
 }
 
 void FileDescriptor::makeValid() {

@@ -2,7 +2,7 @@
 #include <random>
 #include <thread>
 
-#include "p2pMessage.hpp"
+#include "P2PMessage.hpp"
 #include "ProtocolManager.hpp"
 //____________________________________________________________________________//
 

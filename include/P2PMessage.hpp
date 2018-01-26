@@ -1,7 +1,7 @@
 #ifndef INCLUDE_P2PMESSAGE_HPP_
 #define INCLUDE_P2PMESSAGE_HPP_
 
-#include "messageType.hpp"
+#include "MessageType.hpp"
 #include "stdint.h"
 
 

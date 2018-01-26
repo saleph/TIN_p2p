@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "server.hpp"
+#include "Server.hpp"
 
 class UdpServer : public Server
 {

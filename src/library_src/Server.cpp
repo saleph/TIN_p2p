@@ -1,4 +1,4 @@
-#include "server.hpp"
+#include "Server.hpp"
 
 #include <stdio.h> //printf
 #include <string.h>    //memset

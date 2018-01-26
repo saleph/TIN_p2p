@@ -12,7 +12,7 @@
 #include <iostream>
 #include <exception>
 #include <unistd.h>
-#include "md5hash.hpp"
+#include "Md5hash.hpp"
 
 
 class Md5sum {

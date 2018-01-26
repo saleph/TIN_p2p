@@ -1,4 +1,4 @@
-#include "mutex.hpp"
+#include "Mutex.hpp"
 
 #ifndef INCLUDE_GUARD_HPP_
 #define INCLUDE_GUARD_HPP_

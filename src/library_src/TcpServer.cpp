@@ -10,9 +10,9 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 
-#include "tcp_server.hpp"
-#include "socket_exceptions.hpp"
-#include "p2pMessage.hpp"
+#include "TcpServer.hpp"
+#include "SocketExceptions.hpp"
+#include "P2PMessage.hpp"
 
 TcpServer::TcpServer(void (*reactFunc)(uint8_t* data, uint32_t size, SocketOperation),
 		void (*errorCallbackFunc)(SocketOperation) )

@@ -1,4 +1,4 @@
-#include "guard.hpp"
+#include "Guard.hpp"
 
 Guard::Guard(Mutex& m) {
 	mutex = &m;

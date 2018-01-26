@@ -1,5 +1,5 @@
 #include <memory>
-#include "md5sum.hpp"
+#include "Md5sum.hpp"
 
 Md5sum::Md5sum(const std::string &fn)
 	: filename(fn)
