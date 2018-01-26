@@ -1,9 +1,5 @@
 ## 1) Informacje wstępne
 **Temat**: Napisać program obsługujący prosty protokół P2P.
-**Skład zespołu**: Tomasz Gałecki, Bartosz Kołodziejski, Marcin Kondras.
-
-**Data przekazania**:
-
 
 ## 2) Interpretacja i doprecyzowanie treści
 - Plik jest identyfikowany nazwą oraz hashem (MD5), jednak sam hash nie jest wykorzystywany do innego celu niż identyfikacja pliku (mapowanie h >> n jest nie do końca intuicyjne, bo: adresy IP mogą być nieciągłe oraz mogą zostawiać dowolne, nieprzewidziane odległości między sobą w przypadku odłączania węzłów). Informacja o węźle przetrzymującym plik będzie zawarta w deskryptorze pliku. Jego głównym wyróżnikiem jest hash MD5 - dopóki hashe są różne - pliki mogą mieć takie same nazwy.
